@@ -55,3 +55,16 @@ body{min-width:280px}
 #student-join-form .notice{line-height:1.5}
 #student-join-form .btn{white-space:normal;line-height:1.35}
 @media(max-width:380px){.narrow .card{padding:18px 14px}.narrow .hero h1{font-size:27px}}
+
+
+/* QR exclusivo por prueba y selección visible del límite de tiempo. */
+.exam-qr-card{display:grid;grid-template-columns:minmax(180px,250px) minmax(0,1fr);align-items:center;gap:23px;margin:18px 0 22px}
+.exam-qr-preview{display:flex;align-items:center;justify-content:center;min-height:245px;padding:8px;border-radius:12px;border:1px solid #d9e5e9;background:#fff;color:#4c626c;text-align:center;font-size:13px}
+.exam-qr-preview img{width:min(100%,240px);height:auto;aspect-ratio:1;object-fit:contain;image-rendering:auto}
+.exam-qr-information{min-width:0}
+.exam-qr-information h2{font-size:22px;margin:4px 0 8px;line-height:1.25}
+.exam-qr-information p{line-height:1.45;margin:8px 0}
+.exam-qr-url{font-size:12px;background:#f1f6f7;padding:10px;border:1px solid #d9e5e9;border-radius:9px;overflow-wrap:anywhere;word-break:break-word;margin:12px 0}
+.exam-duration-presets{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.exam-duration-presets .btn{min-width:59px}
+@media(max-width:660px){.exam-qr-card{grid-template-columns:1fr;gap:14px}.exam-qr-preview{min-height:0;max-width:100%;padding:12px}.exam-qr-information h2{font-size:20px}}
