@@ -442,11 +442,10 @@ function resumeStudentPosition(){
  try{const stored=key?Number(localStorage.getItem(key)):0;if(Number.isInteger(stored))index=stored}catch(e){}
  studentQuestionIndex=Math.max(0,Math.min(total-1,index));
 }
-async function moveStudentQuestion(delta){
+async function jumpToStudentQuestion(target){
  if(studentNavigating||studentBusy||state.view!=='student-exam')return;
- const target=studentQuestionIndex+delta;
  const total=studentLoad?.questions?.length||0;
- if(target<0||target>=total)return;
+ if(!Number.isInteger(target)||target<0||target>=total)return;
  studentNavigating=true;
  try{
    if(studentRemaining()<=0){toast('El tiempo de la evaluación ya terminó.');return;}
@@ -454,10 +453,11 @@ async function moveStudentQuestion(delta){
    studentQuestionIndex=target;
    rememberStudentPosition();
    renderStudent();
-   window.scrollTo(0,0);
+   window.scrollTo({top:0,behavior:'instant'});
  }catch(e){err(e)}
  finally{studentNavigating=false}
 }
+async function moveStudentQuestion(delta){return jumpToStudentQuestion(studentQuestionIndex+delta)}
 
 function studentRemaining(){return Math.max(0,Math.floor((new Date(studentLoad.participant.expires_at).getTime()-(Date.now()-serverClockOffset))/1000));}
 function studentDone(){const key=studentPositionKey();if(key){try{localStorage.removeItem(key)}catch(e){}}setView('student-done');if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});app.innerHTML=`<div class="narrow"><div class="card" style="text-align:center;padding:50px 28px"><div class="choice-icon student" style="margin:0 auto 16px">✓</div><h1 style="font-size:27px">Entrega registrada</h1><p class="muted">${esc(studentLoad?.participant.name||'Estudiante')}, tu prueba ha sido enviada. El profesor podrá revisar tus respuestas y las incidencias registradas.</p><button class="btn btn-outline" data-action="home" style="margin-top:16px">Volver al inicio</button></div></div>`;}
@@ -494,7 +494,61 @@ function progress(){const n=studentLoad.questions.filter(q=>studentAnswers.has(q
 function queueAnswer(questionId,value){studentAnswers.set(questionId,value);progress();if($('#save-state'))$('#save-state').textContent='Guardando…';clearTimeout(pendingTimers.get(questionId));pendingTimers.set(questionId,setTimeout(()=>{pendingTimers.delete(questionId);persistAnswer(questionId,value).catch(err)},550))}
 function persistAnswer(qid,value){const previous=inFlight.get(qid)||Promise.resolve();const next=previous.catch(()=>{}).then(()=>studentSave(qid,value)).then(()=>{if($('#save-state')&&state.view==='student-exam')$('#save-state').textContent='Respuestas guardadas';}).catch(ex=>{if($('#save-state'))$('#save-state').textContent='Error al guardar: compruebe su conexión';throw ex});inFlight.set(qid,next);return next}
 async function flushAnswers(){for(const [qid,t] of pendingTimers){clearTimeout(t);pendingTimers.delete(qid);await persistAnswer(qid,studentAnswers.get(qid))}await Promise.all([...inFlight.values()]);}
-async function finalizeStudent(){if(studentBusy)return;const n=studentLoad.questions.filter(q=>valueAnswered(studentAnswers.get(q.id),q.kind)).length;if(n<studentLoad.questions.length&&!confirm(`Has respondido ${n} de ${studentLoad.questions.length} preguntas. ¿Quieres entregar de todos modos?`))return;if(!confirm('¿Confirmas la entrega definitiva? Después no podrás modificar respuestas.'))return;studentBusy=true;const b=$('#submit-btn');if(b)b.disabled=true;try{let lateChanges=false;try{await flushAnswers()}catch(saveError){if(studentRemaining()>0&&studentLoad.exam.status==='published')throw saveError;lateChanges=true}await studentSubmit();studentLoad.participant.submitted_at=iso();clearInterval(studentTimer);studentDone();toast(lateChanges?'Entrega confirmada; algunas modificaciones posteriores al plazo no se guardaron':'Entrega confirmada')}catch(e){err(e);if(b)b.disabled=false}finally{studentBusy=false}}
+function unansweredStudentQuestions(){
+ if(!studentLoad?.questions)return [];
+ return studentLoad.questions.flatMap((q,index)=>valueAnswered(studentAnswers.get(q.id),q.kind)?[]:[index]);
+}
+function closeSubmitReview(){
+ const review=$('#submit-review');
+ if(!review)return;
+ review.remove();
+ $('#submit-btn')?.focus();
+}
+function showSubmitReview(){
+ if(studentBusy||studentNavigating||state.view!=='student-exam'||$('#submit-review'))return;
+ const pending=unansweredStudentQuestions(),total=studentLoad.questions.length;
+ const answered=total-pending.length;
+ const dialog=document.createElement('div');
+ dialog.id='submit-review';
+ dialog.className='submit-review-backdrop';
+ dialog.innerHTML=`<section class="submit-review-dialog card" role="dialog" aria-modal="true" aria-labelledby="submit-review-heading" aria-describedby="submit-review-description">
+  <div class="eyebrow">Revisión antes de entregar</div>
+  <h2 id="submit-review-heading">${pending.length?'Tienes preguntas sin responder':'Todas las preguntas están respondidas'}</h2>
+  <p id="submit-review-description">${pending.length?
+   `Has respondido <b>${answered} de ${total}</b> preguntas. Aún faltan <b>${pending.length}</b>. Puedes ir a contestarlas o enviar la prueba de todas maneras.`:
+   `Has respondido las <b>${total}</b> preguntas. ¿Confirmas la entrega definitiva?`}</p>
+  ${pending.length?`<div class="submit-review-pending"><div class="submit-review-subtitle">Preguntas pendientes</div><div class="submit-review-numbers" aria-label="Preguntas sin responder">${pending.map(i=>`<button type="button" class="submit-review-number" data-action="student-jump-pending" data-index="${i}" aria-label="Ir a responder pregunta ${i+1}">${i+1}</button>`).join('')}</div><p class="hint">Selecciona un número para ir directamente a esa pregunta.</p></div>`:''}
+  <p class="submit-review-warning">Una vez entregada la evaluación, no podrás modificar tus respuestas.</p>
+  <div class="submit-review-actions">
+   <button type="button" class="btn btn-outline" data-action="${pending.length?'student-review-pending':'student-cancel-submit'}">${pending.length?'Ir a contestar':'Volver a la prueba'}</button>
+   <button type="button" class="btn btn-green" data-action="student-confirm-submit">${pending.length?'Enviar de todas maneras':'Confirmar entrega'}</button>
+  </div>
+  <button type="button" class="submit-review-close" data-action="student-cancel-submit" aria-label="Cerrar confirmación">×</button>
+ </section>`;
+ app.appendChild(dialog);
+ dialog.querySelector('.submit-review-dialog')?.setAttribute('tabindex','-1');
+ dialog.querySelector('.submit-review-dialog')?.focus();
+}
+async function submitStudentAnswers(){
+ if(studentBusy||studentLoad?.participant.submitted_at)return;
+ studentBusy=true;
+ closeSubmitReview();
+ const b=$('#submit-btn');if(b)b.disabled=true;
+ try{
+  let lateChanges=false;
+  try{await flushAnswers()}catch(saveError){
+   if(studentRemaining()>0&&studentLoad.exam.status==='published')throw saveError;
+   lateChanges=true;
+  }
+  await studentSubmit();
+  studentLoad.participant.submitted_at=iso();
+  clearInterval(studentTimer);
+  studentDone();
+  toast(lateChanges?'Entrega confirmada; algunas modificaciones posteriores al plazo no se guardaron':'Entrega confirmada');
+ }catch(e){err(e);if(b)b.disabled=false}
+ finally{studentBusy=false}
+}
+async function finalizeStudent(){showSubmitReview()}
 
 /* ============================== UI EVENTS ============================== */
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;try{
@@ -512,6 +566,10 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
  if(a==='restore-fullscreen'){const ok=await askFullscreen();if(!ok)toast('Tu navegador no permitió pantalla completa. El profesor puede ver que está desactivada.');fullscreenBanner();return}
  if(a==='download-summary'){exportSummary();return}if(a==='download-detail'){exportDetail();return}
  if(a==='student-prev'){await moveStudentQuestion(-1);return}if(a==='student-next'){await moveStudentQuestion(1);return}
+  if(a==='student-cancel-submit'){closeSubmitReview();return}
+  if(a==='student-review-pending'){const pending=unansweredStudentQuestions();closeSubmitReview();if(pending.length)await jumpToStudentQuestion(pending[0]);return}
+  if(a==='student-jump-pending'){const target=Number(b.dataset.index);closeSubmitReview();await jumpToStudentQuestion(target);return}
+  if(a==='student-confirm-submit'){await submitStudentAnswers();return}
   if(a==='submit-student'){await finalizeStudent();return}
  }catch(ex){err(ex);b.disabled=false}});
 app.addEventListener('submit',async e=>{e.preventDefault();const form=e.target;
