@@ -6,12 +6,23 @@
   <meta name="theme-color" content="#123b4a" />
   <meta name="description" content="Evaluaciones escolares adaptables a todas las pantallas, control de visibilidad, solicitud de pantalla completa y envío de resultados por correo." />
   <title>AulaPrueba B-13 | Evaluaciones supervisadas</title>
-  <link rel="stylesheet" href="styles.css?v=4.4" />
+  <link rel="stylesheet" href="styles.css?v=4.5" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand" id="go-home"><span class="brandmark">A<span class="brand-accent">·</span></span><span>AulaPrueba <b>B-13</b></span></div>
-    <div class="top-actions"><span class="mode-tag" id="mode-tag">Comprobando conexión</span><button class="btn btn-ghost small hidden" id="home-btn">Inicio</button><button class="btn btn-ghost small hidden" id="logout-btn">Cerrar sesión</button></div>
+  <header class="topbar institutional-topbar" aria-label="Encabezado institucional">
+    <div class="institutional-lockup">
+      <img class="institutional-crest" src="assets/escudo-liceo.svg" alt="Escudo del Liceo Bicentenario Industrial Ramón Barros Luco" width="78" height="92" fetchpriority="high" />
+      <div class="institutional-identity">
+        <span class="institutional-eyebrow">Liceo Bicentenario Industrial</span>
+        <span class="institutional-name">Ramón Barros Luco</span>
+        <button type="button" class="institutional-app" id="go-home" title="Volver al ingreso de AulaPrueba B-13">AulaPrueba <b>B-13</b></button>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span class="mode-tag" id="mode-tag">Comprobando conexión</span>
+      <button class="btn btn-ghost small hidden" id="home-btn">Inicio</button>
+      <button class="btn btn-ghost small hidden" id="logout-btn">Cerrar sesión</button>
+    </div>
   </header>
   <main class="shell" id="app"><div class="loading">Iniciando aplicación…</div></main>
   <footer class="site-footer">Supervisión mediante eventos del navegador · Las incidencias no constituyen por sí mismas una prueba de fraude</footer>
