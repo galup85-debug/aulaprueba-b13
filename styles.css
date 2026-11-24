@@ -209,3 +209,15 @@ body{min-width:280px}
  .ped-choice{break-inside:avoid}
  .ped-bar,.ped-kpis{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+
+/* v5.1 — dos zonas de importación visualmente diferenciadas. */
+.file-drop-area{display:flex;flex-direction:column;align-items:center;gap:9px;text-align:center;border:2px dashed #a7c2d0;background:#f4f9fc;border-radius:14px;padding:20px 14px;margin:12px 0;transition:background .15s,border-color .15s;overflow-wrap:anywhere}
+.file-drop-area[data-drop-kind="spec"]{background:#f4faf8;border-color:#a1c9bb}
+.file-drop-area.file-drop-active{background:#e4f1f7;border-color:#136684;box-shadow:inset 0 0 0 1px #136684}
+.file-drop-symbol{width:40px;height:40px;display:grid;place-items:center;border-radius:12px;background:#e1edf5;color:#1b617d}
+.file-drop-area[data-drop-kind="spec"] .file-drop-symbol{background:#deeee6;color:#246751}
+.file-drop-symbol svg{width:22px;height:22px}.file-drop-area strong{font-size:15px;color:#193040}.file-drop-area .hint{font-size:12px;line-height:1.4}
+.file-drop-status{margin:3px 0 0;font-size:12px;color:#365667;max-width:100%;line-height:1.45}
+.file-drop-status.file-drop-error{color:#a33535;font-weight:650}
+.ped-import-paste{margin-top:14px}.ped-import-paste summary{font-size:13px;font-weight:700;cursor:pointer}.ped-import-paste textarea{display:block;width:100%;margin:10px 0}
+@media(max-width:760px){.file-drop-area{padding:16px 12px}.file-drop-area .btn{min-height:44px}}
