@@ -231,3 +231,9 @@ body{min-width:280px}
 .app-version{font-size:11px;color:#385b6d;font-weight:700;white-space:nowrap}
 .exam-row .btn-row{flex-wrap:wrap}
 @media(max-width:760px){.ped-import-grid{grid-template-columns:1fr;gap:12px}.exam-row .btn-row{justify-content:flex-start}}
+
+/* v5.3 — lectura y revisión de PDF. */
+.ocr-option{display:flex;align-items:center;gap:9px;font-size:13px;color:#284b5b;line-height:1.4;margin:12px 0;cursor:pointer}
+.ocr-option input[type=checkbox]{width:17px;height:17px;flex:0 0 auto;accent-color:#166782}
+.pdf-review-box{padding:14px;border:1px solid #c6dce5;background:#f8fbfc;border-radius:12px;margin-top:16px}
+.pdf-review-box h3{margin-top:0}.pdf-review-box textarea{display:block;width:100%;min-height:220px;resize:vertical;font-family:ui-monospace,monospace;line-height:1.5;font-size:12px}
