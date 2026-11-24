@@ -1,4 +1,4 @@
-import {readPDF,parsePDFExam} from './pdf-import.js?v=5.4';
+import {readPDF,parsePDFExam} from './pdf-import.js?v=5.5';
 import {DEFAULT_DIMENSIONS,dimensionsOf,tagsOf,categoriesFrom,analyze,feedback,parseSpecificationTable,scoreItem,generateGoogleScript} from './pedagogia.js?v=5.2';
 /* AulaPrueba B-13 — interfaz navegador. El modo demostración es local y NO comparte datos entre dispositivos. */
 const $ = s => document.querySelector(s);
