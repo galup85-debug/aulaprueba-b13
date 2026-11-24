@@ -235,7 +235,7 @@ function statusLabel(s){return ({draft:'Borrador',published:'Publicada',closed:'
 function draftQuestion(){return {kind:'single',prompt:'',options:['','','',''],correct:[],points:1};}
 async function newExam(){const e={title:'Nueva evaluación',description:'',code:code(),duration_minutes:60,status:'draft'};try{state.exam=await teacherCreate(e);pedagogy=await loadPedagogy(state.exam);state.questions=[];state.draft=[draftQuestion()];editor()}catch(ex){err(ex)}}
 async function openExam(id){const exam=state.exams.find(x=>x.id===id)||state.exam;if(!exam)return;state.exam=exam;try{state.questions=await teacherQuestions(exam);state.draft=copy(state.questions);if(exam.status==='draft'){if(!state.draft.length)state.draft=[draftQuestion()];editor()}else dashboard()}catch(e){err(e)}}
-function editor(){setView('editor');const ex=state.exam;app.innerHTML=`<div class="subhead"><div><div class="eyebrow">Editor de pruebas · Borrador</div><h1>Configurar evaluación</h1></div><button class="btn btn-ghost" data-action="teacher-list">← Mis evaluaciones</button></div><div class="form-columns"><section><div class="card" style="margin-bottom:19px"><div class="field"><label for="exam-title">Título de la evaluación</label><input id="exam-title" maxlength="200" value="${esc(ex.title)}" /></div><div class="field"><label for="exam-description">Instrucciones para los estudiantes</label><textarea id="exam-description">${esc(ex.description)}</textarea></div><div class="field"><label for="exam-duration">Tiempo máximo para rendir la prueba (minutos)</label><input type="number" min="1" max="300" id="exam-duration" value="${ex.duration_minutes}" /><p class="hint">De 1 a 300 minutos. Comienza con el primer ingreso de cada estudiante y no se reinicia al actualizar la página. Al finalizar, se bloquean las respuestas y se registra la entrega.</p><div class="btn-row exam-duration-presets"><button type="button" class="btn btn-outline small" data-action="duration-preset" data-minutes="30">30 min</button><button type="button" class="btn btn-outline small" data-action="duration-preset" data-minutes="45">45 min</button><button type="button" class="btn btn-outline small" data-action="duration-preset" data-minutes="60">60 min</button><button type="button" class="btn btn-outline small" data-action="duration-preset" data-minutes="90">90 min</button><button type="button" class="btn btn-outline small" data-action="duration-preset" data-minutes="120">120 min</button></div></div><div class="field"><label>Código de acceso</label><span class="code">${esc(ex.code)}</span></div></div><div class="subhead"><h2 class="section-title" style="margin:0">Preguntas <span class="pill">${state.draft.length}</span></h2><button class="btn btn-outline small" data-action="add-question">+ Añadir pregunta</button></div>${specEditorHTML()}<div class="stack" id="question-editors">${state.draft.map(questionEditorHTML).join('')}</div><div class="btn-row" style="margin-top:22px"><button class="btn btn-outline" data-action="save-draft">Guardar borrador</button><button class="btn btn-green" data-action="publish">Guardar y publicar</button></div></section><aside><div class="import-card"><h3>Importar desde PDF</h3><p class="hint">Extrae texto de PDF digitales y propone preguntas de selección múltiple. Debes revisar la pauta y el formato.</p><label class="btn btn-outline small" style="display:inline-block" for="pdf-file">Seleccionar PDF</label><input type="file" accept="application/pdf" id="pdf-file" class="hidden-file" /><div id="pdf-info" class="hint" style="margin-top:9px"></div></div><div class="import-card" style="margin-top:15px"><h3>Importar Google Apps Script</h3><p class="hint">Pega el script de Google Forms. Admite enunciado, opciones, correcta y categorías; también tablaEspecificaciones. El código no se ejecuta.</p><div class="field"><textarea id="script-input" placeholder="const item = form.addMultipleChoiceItem();\nitem.setTitle('...')..." style="min-height:142px">${esc(state.importText)}</textarea></div><button class="btn btn-outline small" data-action="import-script">Analizar script</button></div><div class="notice warning" style="margin-top:15px">La extracción de PDF no incluye OCR para páginas escaneadas. Preguntas con imágenes, tablas o columnas pueden requerir edición manual. Las respuestas correctas no se deducen del PDF.</div></aside></div>`;insertExamQR(ex);}
+function editor(){setView('editor');const ex=state.exam;app.innerHTML=`<div class="subhead"><div><div class="eyebrow">Editor de pruebas · Borrador</div><h1>Configurar evaluación</h1></div><button class="btn btn-ghost" data-action="teacher-list">← Mis evaluaciones</button></div><div class="form-columns"><section><div class="card" style="margin-bottom:19px"><div class="field"><label for="exam-title">Título de la evaluación</label><input id="exam-title" maxlength="200" value="${esc(ex.title)}" /></div><div class="field"><label for="exam-description">Instrucciones para los estudiantes</label><textarea id="exam-description">${esc(ex.description)}</textarea></div><div class="field"><label for="exam-duration">Tiempo máximo para rendir la prueba (minutos)</label><input type="number" min="1" max="300" id="exam-duration" value="${ex.duration_minutes}" /><p class="hint">De 1 a 300 minutos. Comienza con el primer ingreso de cada estudiante y no se reinicia al actualizar la página. Al finalizar, se bloquean las respuestas y se registra la entrega.</p><div class="btn-row exam-duration-presets"><button type="button" class="btn btn-outline small" data-action="duration-preset" data-minutes="30">30 min</button><button type="button" class="btn btn-outline small" data-action="duration-preset" data-minutes="45">45 min</button><button type="button" class="btn btn-outline small" data-action="duration-preset" data-minutes="60">60 min</button><button type="button" class="btn btn-outline small" data-action="duration-preset" data-minutes="90">90 min</button><button type="button" class="btn btn-outline small" data-action="duration-preset" data-minutes="120">120 min</button></div></div><div class="field"><label>Código de acceso</label><span class="code">${esc(ex.code)}</span></div></div><div class="subhead"><h2 class="section-title" style="margin:0">Preguntas <span class="pill">${state.draft.length}</span></h2><button class="btn btn-outline small" data-action="add-question">+ Añadir pregunta</button></div>${specEditorHTML()}<div class="stack" id="question-editors">${state.draft.map(questionEditorHTML).join('')}</div><div class="btn-row" style="margin-top:22px"><button class="btn btn-outline" data-action="save-draft">Guardar borrador</button><button class="btn btn-green" data-action="publish">Guardar y publicar</button></div></section><aside>${examImportHTML()}<div class="notice warning" style="margin-top:15px">Los PDF deben contener texto seleccionable. Revisa las preguntas, sus alternativas, la pauta y las categorías antes de publicar.</div></aside></div>`;insertExamQR(ex);}
 function questionEditorHTML(q,i){const options=Array.isArray(q.options)?q.options:[];const correct=Array.isArray(q.correct)?q.correct.map(x=>Number(x)+1).join(', '):'';return `<article class="question-editor" data-q="${i}"><div class="editor-top"><h3>Pregunta ${i+1}</h3><button class="btn btn-ghost small" data-action="remove-question" data-i="${i}">Eliminar</button></div><div class="field"><label>Enunciado</label><textarea data-field="prompt" placeholder="Escriba el enunciado">${esc(q.prompt)}</textarea></div><div class="editor-grid"><div class="field"><label>Tipo de pregunta</label><select data-field="kind"><option value="single" ${q.kind==='single'?'selected':''}>Selección única</option><option value="multi" ${q.kind==='multi'?'selected':''}>Selección múltiple</option><option value="short" ${q.kind==='short'?'selected':''}>Respuesta abierta</option></select></div><div class="field"><label>Puntaje</label><input type="number" min="0" max="100" step="0.5" data-field="points" value="${esc(q.points)}" /></div></div><div class="field choice-config ${q.kind==='short'?'hidden':''}"><label>Alternativas (una por línea)</label><textarea data-field="options" rows="5" placeholder="Alternativa A&#10;Alternativa B&#10;Alternativa C">${esc(options.join('\n'))}</textarea><span class="hint">Sin letras A, B, C ni numeración. Se agregarán automáticamente.</span></div><div class="field choice-config ${q.kind==='short'?'hidden':''}"><label>Alternativa(s) correcta(s)</label><input data-field="correct" value="${esc(correct)}" placeholder="Ej.: 2, o 1, 3 para selección múltiple" /><span class="hint">Ingrese el número de la alternativa, comenzando por 1. Es obligatorio antes de publicar.</span></div>${categoryFields(q)}</article>`;}
 function collectDraft(){const container=$('#question-editors');if(!container)return;pedagogy.dimensions=dimensionsOf([0,1,2].map(i=>$('#ped-dim-'+i)?.value||pedagogy.dimensions[i]));state.exam={...state.exam,title:$('#exam-title')?.value??state.exam.title,description:$('#exam-description')?.value??state.exam.description,duration_minutes:Number($('#exam-duration')?.value??state.exam.duration_minutes)};state.draft=[...container.querySelectorAll('[data-q]')].map(node=>{const get=k=>node.querySelector(`[data-field="${k}"]`)?.value??'';let options=get('options').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);let kind=get('kind');let correct=[...new Set(get('correct').split(/[,;\s]+/).map(x=>Number(x)).filter(n=>Number.isInteger(n)&&n>0).map(n=>n-1))].sort((a,b)=>a-b);return {kind,prompt:get('prompt').trim(),points:Number(get('points')),options:kind==='short'?[]:options,correct:kind==='short'?[]:correct,categories:tagsOf([0,1,2].map(i=>get('category-'+i)))}});state.importText=$('#script-input')?.value||state.importText;}
 function validateDraft(publicar=false){const title=$('#exam-title')?.value.trim()||state.exam.title,minutes=Number($('#exam-duration')?.value);if(title.length<3)throw Error('Escriba un título de al menos 3 caracteres');if(!Number.isInteger(minutes)||minutes<1||minutes>300)throw Error('La duración debe estar entre 1 y 300 minutos');if(publicar&&!state.draft.length)throw Error('Añada al menos una pregunta');for(let i=0;i<state.draft.length;i++){const q=state.draft[i];if(!q.prompt)throw Error(`Falta el enunciado de la pregunta ${i+1}`);if(!Number.isFinite(q.points)||q.points<0||q.points>100)throw Error(`Puntaje inválido en pregunta ${i+1}`);if(q.kind!=='short'){if(q.options.length<2||q.options.length>10)throw Error(`La pregunta ${i+1} necesita entre 2 y 10 alternativas`);if(q.correct.some(n=>n>=q.options.length))throw Error(`Revise la pauta de la pregunta ${i+1}`);if(publicar&&q.correct.length===0)throw Error(`Indique la alternativa correcta en la pregunta ${i+1}`);if(q.kind==='single'&&q.correct.length>1)throw Error(`La pregunta ${i+1} solo admite una respuesta correcta`)}}}
@@ -386,16 +386,91 @@ async function pdfRead(file,tableMode=false){if(file.size>15*1024*1024)throw Err
 function addImported(items,source){if(!items.length)throw Error('No se detectaron preguntas compatibles. Revise el formato y agréguelas manualmente');collectDraft();if(state.draft.length===1&&!state.draft[0].prompt)state.draft=[];state.draft.push(...items.slice(0,100-state.draft.length));editor();toast(`${items.length} pregunta(s) importadas desde ${source}. Revise cada alternativa y su pauta.`,6000);}
 
 
+
+/* v5.1 — dos entradas de archivos independientes. */
+let importBusy=false;
+const importStatus={exam:null,spec:null};
+function dropZoneHTML(kind){
+ const exam=kind==='exam',id='drop-file-'+kind,accept=exam?'.pdf,.gs,.js,.txt,application/pdf,text/plain':'.pdf,.csv,.tsv,.txt,application/pdf,text/csv,text/plain';
+ const status=importStatus[kind]?.examId===state.exam?.id?importStatus[kind]:null;
+ return '<div class="file-drop-area" data-drop-kind="'+kind+'"><div class="file-drop-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V3M7 8l5-5 5 5M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></svg></div><strong>Arrastra y suelta '+(exam?'la prueba':'la tabla de especificaciones')+'</strong><span class="hint">'+(exam?'PDF digital o Google Apps Script (.gs, .js, .txt)':'PDF digital, CSV, TSV o texto delimitado (.txt)')+'</span><label for="'+id+'" class="btn btn-outline small">Seleccionar archivo</label><input id="'+id+'" data-import-kind="'+kind+'" type="file" accept="'+accept+'" class="hidden-file"><p class="file-drop-status'+(status?.error?' file-drop-error':'')+'" role="status" aria-live="polite">'+esc(status?.message||'Ningún archivo cargado')+'</p></div>';
+}
+function examImportHTML(){
+ return '<section class="import-card"><div class="eyebrow">01 · Evaluación</div><h3>Importar prueba</h3><p class="hint">Carga aquí el instrumento con las preguntas. Si es un script, también puede incluir las respuestas correctas.</p>'+dropZoneHTML('exam')+'<details class="ped-import-paste"><summary>O pegar Google Apps Script</summary><textarea id="script-input" class="input" rows="5" placeholder="Pega el código de tu evaluación">'+esc(state.importText)+'</textarea><button type="button" class="btn btn-outline small" data-action="import-script">Analizar script</button></details></section>';
+}
+function setImportStatus(kind,message,error=false){
+ importStatus[kind]={examId:state.exam?.id,message,error};
+ const el=app.querySelector('[data-drop-kind="'+kind+'"] .file-drop-status');
+ if(el){el.textContent=message;el.classList.toggle('file-drop-error',error)}
+}
+async function importDroppedFile(kind,file){
+ if(state.view!=='editor'||!file)return;
+ if(importBusy){toast('Espera a que termine la importación actual.');return}
+ const examId=state.exam?.id,ext=file.name.split('.').pop().toLowerCase();
+ const isCurrent=()=>state.view==='editor'&&state.exam?.id===examId;
+ if(kind==='exam'&&!['pdf','gs','js','txt'].includes(ext)||kind==='spec'&&!['pdf','csv','tsv','txt'].includes(ext)){setImportStatus(kind,'Formato no compatible: '+file.name,true);return}
+ if(file.size>15*1024*1024){setImportStatus(kind,'El archivo supera el máximo de 15 MB.',true);return}
+ if(kind==='spec'&&!state.draft.some(q=>q.prompt?.trim())&&!app.querySelector('[data-field="prompt"]')?.value.trim()){setImportStatus(kind,'Primero importa la prueba para poder vincular sus preguntas.',true);return}
+ importBusy=true;setImportStatus(kind,'Procesando '+file.name+'…');
+ try{
+  if(kind==='exam'){
+   let qs;
+   if(ext==='pdf'){
+    const text=await pdfRead(file),marker=text.search(/^\s*tabla de especificaciones\s*$/im);
+    qs=parseTextQuestions(marker>=0?text.slice(0,marker):text);
+    if(marker>=0){const tab=await pdfRead(file,true),at=tab.search(/^\s*tabla de especificaciones\s*$/im);if(at>=0)applyImportedSpecs(qs,parseSpecificationTable(tab.slice(at),pedagogy.dimensions).rows,true)}
+   }else{
+    const text=await file.text();
+    qs=parseAppsScript(text);
+    if(!qs.length&&ext==='txt')qs=parseTextQuestions(text);
+   }
+   if(!isCurrent())return;
+   if(!qs.length)throw Error('No se detectaron preguntas compatibles. Comprueba el formato.');
+   collectDraft();
+   const existing=state.draft.filter(q=>q.prompt.trim()).length;
+   if(existing&&!confirm('La evaluación ya contiene '+existing+' preguntas. ¿Añadir las nuevas al final?')){setImportStatus(kind,'Importación cancelada; se conservaron las preguntas.');return}
+   const room=100-(state.draft.length===1&&!state.draft[0].prompt?0:state.draft.length);
+   if(room<=0)throw Error('Se alcanzó el máximo de 100 preguntas.');
+   const count=Math.min(room,qs.length);
+   pendingSpecRows=[];
+   setImportStatus(kind,file.name+' · '+count+' pregunta(s) incorporadas.'+(count<qs.length?' Límite de 100 preguntas alcanzado.':''));
+   addImported(qs.slice(0,count),file.name);
+  }else{
+   const text=ext==='pdf'?await pdfRead(file,true):await file.text();
+   if(!isCurrent())return;
+   collectDraft();
+   const parsed=parseSpecificationTable(ext==='csv'?csvToTabular(text):text,pedagogy.dimensions);
+   previewSpecImport(parsed);
+   setImportStatus(kind,file.name+' · '+parsed.rows.length+' fila(s) detectadas. Revisa y aplica las categorías.');
+  }
+ }catch(e){if(isCurrent()){setImportStatus(kind,e.message||String(e),true);err(e)}}
+ finally{importBusy=false}
+}
+function csvToTabular(text){
+ const raw=String(text).replace(/^\ufeff/,'');
+ // CSV con comillas y comas; los archivos delimitados por punto y coma o tabulador conservan su separador.
+ const header=raw.split(/\r?\n/,1)[0];
+ const delim=header.includes(';')?';':header.includes('\t')?'\t':',';
+ const rows=[];let row=[],field='',quoted=false;
+ for(let i=0;i<raw.length;i++){const c=raw[i];if(c==='"'){if(quoted&&raw[i+1]==='"'){field+='"';i++}else quoted=!quoted}
+ else if(c===delim&&!quoted){row.push(field);field=''}
+ else if((c==='\r'||c==='\n')&&!quoted){if(c==='\r'&&raw[i+1]==='\n')i++;row.push(field);rows.push(row);row=[];field=''}
+ else field+=c}
+ if(quoted)throw Error('CSV con comillas sin cerrar.');
+ if(field||row.length){row.push(field);rows.push(row)}
+ return rows.map(r=>r.map(v=>v.replace(/[\t\r\n]/g,' ')).join('\t')).join('\n');
+}
+
 /* v5 · Editor de especificaciones */
 function categoryFields(q){
  const tags=tagsOf(q.categories);
  return '<div class="ped-category-grid">'+dimensionsOf(pedagogy.dimensions).map((d,i)=>'<div class="field"><label>'+esc(d)+'</label><input data-field="category-'+i+'" maxlength="160" value="'+esc(tags[i])+'" placeholder="Opcional"></div>').join('')+'</div>';
 }
 function specEditorHTML(){
- return '<section class="card ped-spec"><h3>Tabla de especificaciones</h3><p class="hint">Hasta tres dimensiones opcionales por pregunta. Cambia los nombres aquí y revisa los valores en cada pregunta antes de publicar.</p>'+
+ return '<section class="card ped-spec"><div class="eyebrow">02 · Clasificación pedagógica</div><h3>Tabla de especificaciones</h3><p class="hint">Hasta tres dimensiones opcionales por pregunta. Cambia los nombres aquí y revisa los valores en cada pregunta antes de publicar.</p>'+
  (pedagogy.ready===false?'<p class="notice warning">Para guardar categorías y correcciones abiertas debes ejecutar actualizacion_v5.sql en Supabase.</p>':'')+
  '<div class="ped-category-grid">'+dimensionsOf(pedagogy.dimensions).map((d,i)=>'<div class="field"><label>Dimensión '+(i+1)+'</label><input id="ped-dim-'+i+'" maxlength="80" value="'+esc(d)+'"></div>').join('')+'</div>'+
- '<div class="btn-row"><button type="button" class="btn btn-outline small" data-action="ped-dim-refresh">Actualizar nombres</button><button type="button" class="btn btn-outline small" data-action="ped-spec-preview">Ver tabla</button><label class="btn btn-outline small" for="spec-pdf">Importar tabla PDF</label><input id="spec-pdf" type="file" accept="application/pdf" class="hidden-file"></div>'+
+ '<div class="btn-row"><button type="button" class="btn btn-outline small" data-action="ped-dim-refresh">Actualizar nombres</button><button type="button" class="btn btn-outline small" data-action="ped-spec-preview">Ver tabla</button></div>'+dropZoneHTML('spec')+''+
  '<details style="margin-top:12px"><summary>Pegar tabla de especificaciones</summary><textarea id="spec-table" class="input" rows="5" placeholder="Pregunta | Conocimiento | Habilidad | Eje temático&#10;1 | Personajes | Interpretar | Identidad"></textarea><button type="button" class="btn btn-outline small" data-action="ped-spec-paste">Interpretar tabla</button></details><div id="ped-spec-review"></div></section>';
 }
 function applyImportedSpecs(items,rows,bySource=false){
@@ -746,8 +821,8 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
  if(a==='ped-dim-refresh'){collectDraft();editor();return}
  if(a==='ped-spec-preview'){collectDraft();showSpecPreview();return}
  if(a==='ped-spec-paste'){collectDraft();previewSpecImport(parseSpecificationTable($('#spec-table').value,pedagogy.dimensions));return}
- if(a==='ped-spec-apply'){collectDraft();const r=applyImportedSpecs(state.draft,pendingSpecRows);pendingSpecRows=[];editor();showSpecPreview(r.matched+' filas aplicadas.'+(r.miss.length?' No vinculadas: '+r.miss.join(', '):''));return}
- if(a==='ped-spec-cancel'){pendingSpecRows=[];$('#ped-spec-review').innerHTML='';return}
+ if(a==='ped-spec-apply'){collectDraft();const r=applyImportedSpecs(state.draft,pendingSpecRows);pendingSpecRows=[];setImportStatus('spec',r.matched+' filas aplicadas.'+(r.miss.length?' No vinculadas: '+r.miss.join(', '):''));editor();showSpecPreview(r.matched+' filas aplicadas.'+(r.miss.length?' No vinculadas: '+r.miss.join(', '):''));return}
+ if(a==='ped-spec-cancel'){pendingSpecRows=[];$('#ped-spec-review').innerHTML='';setImportStatus('spec','Importación cancelada.');return}
  if(a==='duration-preset'){const field=$('#exam-duration');if(field){field.value=b.dataset.minutes;field.focus()}return}
   if(a==='download-qr'){downloadExamQR();toast('Código QR descargado');return}
   if(a==='copy-link'){const url=examJoinUrl(state.exam);await navigator.clipboard.writeText(url);toast('Enlace de ingreso copiado');return}
@@ -778,10 +853,13 @@ app.addEventListener('submit',async e=>{e.preventDefault();const form=e.target;
  if(form.id==='student-code-form'){studentEntrance($('#join-code').value);return}
  if(form.id==='student-join-form'){const btn=form.querySelector('button[type=submit]');btn.disabled=true;try{const fullRequest=askFullscreen();await studentBegin(state.joinCode,$('#join-name').value,$('#join-course').value,$('#join-list').value,$('#join-email').value);const full=await fullRequest;if(!full)toast('El navegador no permitió pantalla completa. Usa el botón para intentarlo de nuevo.');fullscreenBanner()}catch(ex){err(ex);btn.disabled=false;if(document.fullscreenElement&&state.view==='student-join')document.exitFullscreen().catch(()=>{})}}});
 app.addEventListener('change',async e=>{
- if(e.target.id==='spec-pdf'&&e.target.files?.[0]){try{collectDraft();const t=await pdfRead(e.target.files[0],true);previewSpecImport(parseSpecificationTable(t,pedagogy.dimensions))}catch(ex){err(ex)}return}
- if(e.target.id==='pdf-file'&&e.target.files?.[0]){const info=$('#pdf-info');try{info.textContent='Extrayendo texto del PDF…';const file=e.target.files[0];const text=await pdfRead(file);const marker=text.search(/^\s*tabla de especificaciones\s*$/im);const questions=parseTextQuestions(marker>=0?text.slice(0,marker):text);if(marker>=0){const tab=await pdfRead(file,true);const at=tab.search(/^\s*tabla de especificaciones\s*$/im);if(at>=0)applyImportedSpecs(questions,parseSpecificationTable(tab.slice(at),pedagogy.dimensions).rows,true)}info.textContent=`${questions.length} preguntas de selección detectadas.`;addImported(questions,'PDF')}catch(ex){info.textContent='No fue posible interpretar el PDF.';err(ex)}return}
+ if(e.target.dataset.importKind&&e.target.files?.[0]){const input=e.target,file=input.files[0],kind=input.dataset.importKind;input.value='';await importDroppedFile(kind,file);return}
  if(e.target.dataset.field==='kind'){const node=e.target.closest('.question-editor');node.querySelectorAll('.choice-config').forEach(x=>x.classList.toggle('hidden',e.target.value==='short'))}
  if(e.target.dataset.studentQ&&e.target.dataset.kind!=='short'){const qid=e.target.dataset.studentQ,kind=e.target.dataset.kind;let response=kind==='multi'?[...app.querySelectorAll(`[data-student-q="${qid}"]:checked`)].map(x=>Number(x.value)):Number(e.target.value);queueAnswer(qid,response)}});
+// Evitar que arrastrar un archivo al editor navegue fuera de la página.
+app.addEventListener('dragover',e=>{if(state.view!=='editor'||!Array.from(e.dataTransfer?.types||[]).includes('Files'))return;e.preventDefault();const zone=e.target.closest('[data-drop-kind]');if(zone){zone.classList.add('file-drop-active');e.dataTransfer.dropEffect='copy'}});
+app.addEventListener('dragleave',e=>{const zone=e.target.closest('[data-drop-kind]');if(zone&&!zone.contains(e.relatedTarget))zone.classList.remove('file-drop-active')});
+app.addEventListener('drop',e=>{if(state.view!=='editor'||!e.dataTransfer?.files?.length)return;e.preventDefault();const zone=e.target.closest('[data-drop-kind]');app.querySelectorAll('.file-drop-active').forEach(n=>n.classList.remove('file-drop-active'));if(!zone){toast('Suelta el archivo en el cuadro correspondiente.');return}if(e.dataTransfer.files.length!==1){toast('Carga un archivo a la vez.');return}void importDroppedFile(zone.dataset.dropKind,e.dataTransfer.files[0])});
 app.addEventListener('input',e=>{if(e.target.dataset.studentQ&&e.target.dataset.kind==='short')queueAnswer(e.target.dataset.studentQ,e.target.value)});
 $('#home-btn').addEventListener('click',viewHome);$('#go-home').addEventListener('click',viewHome);$('#logout-btn').addEventListener('click',async()=>{try{await supa?.auth.signOut();state.teacher=null;viewHome()}catch(ex){err(ex)}});
 
