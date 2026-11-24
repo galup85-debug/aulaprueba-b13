@@ -221,3 +221,13 @@ body{min-width:280px}
 .file-drop-status.file-drop-error{color:#a33535;font-weight:650}
 .ped-import-paste{margin-top:14px}.ped-import-paste summary{font-size:13px;font-weight:700;cursor:pointer}.ped-import-paste textarea{display:block;width:100%;margin:10px 0}
 @media(max-width:760px){.file-drop-area{padding:16px 12px}.file-drop-area .btn{min-height:44px}}
+
+/* v5.2 — importadores juntos y exportación Google Forms. */
+.ped-import-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start;margin:18px 0 24px}
+.ped-import-grid .ped-spec{margin:0}.ped-import-grid .import-card{margin:0}.ped-import-grid .ped-category-grid{grid-template-columns:1fr}
+.script-preview{display:block;width:100%;font-family:ui-monospace,monospace;font-size:12px;line-height:1.5;margin:12px 0;min-height:210px}
+.exam-script-modal{width:min(90vw,780px);max-height:85dvh;overflow:auto;border:1px solid #dce7eb;border-radius:16px;padding:20px;color:#193040}
+.exam-script-modal::backdrop{background:rgba(10,29,40,.65)}
+.app-version{font-size:11px;color:#385b6d;font-weight:700;white-space:nowrap}
+.exam-row .btn-row{flex-wrap:wrap}
+@media(max-width:760px){.ped-import-grid{grid-template-columns:1fr;gap:12px}.exam-row .btn-row{justify-content:flex-start}}
