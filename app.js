@@ -410,7 +410,7 @@ async function importDroppedFile(kind,file){
  const isCurrent=()=>state.view==='editor'&&state.exam?.id===examId;
  if(kind==='exam'&&!['pdf','gs','js','txt'].includes(ext)||kind==='spec'&&!['pdf','csv','tsv','txt'].includes(ext)){setImportStatus(kind,'Formato no compatible: '+file.name,true);return}
  if(file.size>15*1024*1024){setImportStatus(kind,'El archivo supera el máximo de 15 MB.',true);return}
- if(kind==='spec'&&!state.draft.some(q=>q.prompt?.trim())&&!app.querySelector('[data-field="prompt"]')?.value.trim()){setImportStatus(kind,'Primero importa la prueba para poder vincular sus preguntas.',true);return}
+ if(kind==='spec'&&![...app.querySelectorAll('[data-field="prompt"]')].some(q=>q.value.trim())){setImportStatus(kind,'Primero importa la prueba para poder vincular sus preguntas.',true);return}
  importBusy=true;setImportStatus(kind,'Procesando '+file.name+'…');
  try{
   if(kind==='exam'){
@@ -499,12 +499,14 @@ function showSpecPreview(message=''){
 function previewSpecImport(parsed){
  if(!parsed.rows.length)throw Error('No se reconocieron filas. Usa columnas Pregunta, '+pedagogy.dimensions.join(', ')+', separadas por | o tabuladores.');
  const panel=$('#ped-spec-review');if(!panel)return;
- pendingSpecRows=parsed.rows;
+ const invalid=parsed.rows.filter(r=>r.number<1||r.number>state.draft.length).map(r=>r.number);
+ if(invalid.length)parsed.warnings.push('Fuera de la numeración actual: '+invalid.join(', ')+'. Estas filas no se aplicarán.');
+ pendingSpecRows=parsed.rows;pendingSpecExamId=state.exam.id;pendingSpecSignature=JSON.stringify(state.draft.map(q=>q.prompt));
  panel.innerHTML='<p class="notice warning">Revisa estas filas antes de aplicarlas. Los números se refieren al orden actual de las preguntas.</p>'+
  (parsed.warnings.length?'<p class="hint">'+esc(parsed.warnings.join(' · '))+'</p>':'')+
  '<div class="table-wrap"><table><thead><tr><th>Pregunta</th>'+pedagogy.dimensions.map(d=>'<th>'+esc(d)+'</th>').join('')+'</tr></thead><tbody>'+parsed.rows.map(r=>'<tr><td>'+r.number+'</td>'+r.tags.map(t=>'<td>'+esc(t||'—')+'</td>').join('')+'</tr>').join('')+'</tbody></table></div><div class="btn-row"><button type="button" class="btn btn-green small" data-action="ped-spec-apply">Aplicar categorías</button><button type="button" class="btn btn-outline small" data-action="ped-spec-cancel">Cancelar</button></div>';
 }
-let pendingSpecRows=[];
+let pendingSpecRows=[],pendingSpecExamId=null,pendingSpecSignature='';
 
 /* ============================ SUPERVISIÓN =========================== */
 function scoring(student,snap,qs){let auto=0,max=0,open=0;for(const q of qs){if(q.kind==='short'){open++;continue}max+=Number(q.points);const resp=snap.answers.find(a=>a.participant_id===student.id&&a.question_id===q.id)?.response;const target=(q.correct||[]).map(Number).sort((a,b)=>a-b);const given=q.kind==='multi'?(Array.isArray(resp)?resp.map(Number).sort((a,b)=>a-b):[]):(resp===null||resp===undefined?[]:[Number(resp)]);if(target.length&&JSON.stringify(target)===JSON.stringify(given))auto+=Number(q.points)}return {auto,max,open};}
@@ -821,8 +823,8 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
  if(a==='ped-dim-refresh'){collectDraft();editor();return}
  if(a==='ped-spec-preview'){collectDraft();showSpecPreview();return}
  if(a==='ped-spec-paste'){collectDraft();previewSpecImport(parseSpecificationTable($('#spec-table').value,pedagogy.dimensions));return}
- if(a==='ped-spec-apply'){collectDraft();const r=applyImportedSpecs(state.draft,pendingSpecRows);pendingSpecRows=[];setImportStatus('spec',r.matched+' filas aplicadas.'+(r.miss.length?' No vinculadas: '+r.miss.join(', '):''));editor();showSpecPreview(r.matched+' filas aplicadas.'+(r.miss.length?' No vinculadas: '+r.miss.join(', '):''));return}
- if(a==='ped-spec-cancel'){pendingSpecRows=[];$('#ped-spec-review').innerHTML='';setImportStatus('spec','Importación cancelada.');return}
+ if(a==='ped-spec-apply'){collectDraft();if(pendingSpecExamId!==state.exam.id||pendingSpecSignature!==JSON.stringify(state.draft.map(q=>q.prompt)))throw Error('Las preguntas cambiaron desde la vista previa. Vuelve a importar la tabla.');const r=applyImportedSpecs(state.draft,pendingSpecRows);pendingSpecRows=[];setImportStatus('spec',r.matched+' filas aplicadas.'+(r.miss.length?' No vinculadas: '+r.miss.join(', '):''));editor();showSpecPreview(r.matched+' filas aplicadas.'+(r.miss.length?' No vinculadas: '+r.miss.join(', '):''));return}
+ if(a==='ped-spec-cancel'){pendingSpecRows=[];pendingSpecExamId=null;$('#ped-spec-review').innerHTML='';setImportStatus('spec','Importación cancelada.');return}
  if(a==='duration-preset'){const field=$('#exam-duration');if(field){field.value=b.dataset.minutes;field.focus()}return}
   if(a==='download-qr'){downloadExamQR();toast('Código QR descargado');return}
   if(a==='copy-link'){const url=examJoinUrl(state.exam);await navigator.clipboard.writeText(url);toast('Enlace de ingreso copiado');return}
