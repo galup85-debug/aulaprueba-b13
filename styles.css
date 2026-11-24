@@ -237,3 +237,15 @@ body{min-width:280px}
 .ocr-option input[type=checkbox]{width:17px;height:17px;flex:0 0 auto;accent-color:#166782}
 .pdf-review-box{padding:14px;border:1px solid #c6dce5;background:#f8fbfc;border-radius:12px;margin-top:16px}
 .pdf-review-box h3{margin-top:0}.pdf-review-box textarea{display:block;width:100%;min-height:220px;resize:vertical;font-family:ui-monospace,monospace;line-height:1.5;font-size:12px}
+
+/* v5.4 — vista de ítems detectados, sin transcripción del PDF. */
+.pdf-item-list{display:grid;gap:10px;max-height:620px;overflow-y:auto;margin:13px 0;padding:2px 4px 2px 0}
+.pdf-detected-item{background:#fff;border:1px solid #d7e4e9;border-radius:10px;padding:12px;overflow-wrap:anywhere}
+.pdf-item-select{display:flex;align-items:flex-start;gap:8px;color:#17617b;font-size:12px;font-weight:750;cursor:pointer}
+.pdf-item-select input{width:17px;height:17px;flex:0 0 auto;accent-color:#166782;margin-top:1px}
+.pdf-item-prompt{font-size:14px;font-weight:650;line-height:1.5;white-space:pre-wrap;margin:9px 0}
+.pdf-detected-item ol{margin:8px 0;padding-left:25px;font-size:13px;line-height:1.5}
+.pdf-detected-item li{padding:2px 0}.pdf-key{color:#176751;font-size:11px}
+.pdf-review-warnings{margin:10px 0;font-size:12px;color:#85521e}
+.pdf-review-warnings ul{padding-left:20px}
+@media(max-width:760px){.pdf-item-list{max-height:55vh}.pdf-item-select input{width:20px;height:20px}}
