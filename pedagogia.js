@@ -72,7 +72,7 @@ export function feedback(report){
 }
 export function parseSpecificationTable(text,dimensionNames=DEFAULT_DIMENSIONS){
  const names=dimensionsOf(dimensionNames);
- const split=line=>line.includes('\t')?line.split(/\t+/):line.includes('|')?line.split('|'):line.includes(';')?line.split(';'):line.split(/ {2,}/);
+ const split=line=>line.includes('\t')?line.split('\t'):line.includes('|')?line.split('|'):line.includes(';')?line.split(';'):line.split(/ {2,}/);
  const out=[],warnings=[];let header=null,headerSeen=false;
  const aliases=[['conocimiento','contenido','knowledge'],['habilidad','skill'],['eje tematico','eje','tema','topic']];
  for(const [i,raw] of String(text??'').replace(/\r/g,'').split('\n').entries()){
