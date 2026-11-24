@@ -98,3 +98,65 @@ export function parseSpecificationTable(text,dimensionNames=DEFAULT_DIMENSIONS){
  if(!headerSeen&&out.length)warnings.push('Se asumió orden de columnas: pregunta, '+names.join(', ')+'.');
  return {rows:out,warnings};
 }
+
+/* v5.2: exportación reproducible, sin ejecutar código ni publicar formularios. */
+export function generateGoogleScript(exam,questions,dimensions){
+ if(!questions.length)throw Error('Añade preguntas antes de generar el script.');
+ const dims=dimensionsOf(dimensions);
+ const rows=questions.map((q,i)=>{
+  const kind=['single','multi','short'].includes(q.kind)?q.kind:'single';
+  const prompt=String(q.prompt??'').trim(),points=Number(q.points);
+  const options=kind==='short'?[]:(q.options||[]).map(v=>String(v).trim());
+  const correct=kind==='short'?[]:[...new Set((q.correct||[]).map(Number))];
+  if(!prompt)throw Error('Falta el enunciado de la pregunta '+(i+1));
+  if(!Number.isInteger(points)||points<0||points>100)throw Error('Google Forms requiere puntajes enteros. Revisa la pregunta '+(i+1));
+  if(kind!=='short'&&(options.length<2||options.length>10||options.some(x=>!x)||new Set(options).size!==options.length||!correct.length||correct.some(n=>!Number.isInteger(n)||n<0||n>=options.length)||(kind==='single'&&correct.length!==1)))throw Error('Revisa alternativas y pauta de la pregunta '+(i+1));
+  return {numero:i+1,tipo:kind,enunciado:prompt,opciones:options,correcta:correct,puntos:points,categorias:tagsOf(q.categories)};
+ });
+ const literal=v=>JSON.stringify(v,null,2).replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
+ const specs=rows.map(q=>({pregunta:q.numero,categorias:q.categorias}));
+ return [
+ '// Generado por AulaPrueba B-13 v5.2.',
+ '// Ejecuta crearEvaluacion() una sola vez en script.google.com.',
+ '// Crea un formulario y una hoja de especificaciones separada; las categorías no se muestran al alumno.',
+ '// Google Forms no reproduce el temporizador ni la supervisión de AulaPrueba.',
+ 'const tituloEvaluacion = '+literal(String(exam.title||'Evaluación'))+';',
+ 'const instruccionesEvaluacion = '+literal(String(exam.description||''))+';',
+ 'const dimensionesEvaluacion = '+literal(dims)+';',
+ 'const preguntas = '+literal(rows)+';',
+ 'const tablaEspecificaciones = '+literal(specs)+';',
+ '',
+ 'function crearEvaluacion() {',
+ '  const form = FormApp.create(tituloEvaluacion);',
+ '  form.setIsQuiz(true);',
+ '  form.setDescription(instruccionesEvaluacion);',
+ '  form.setShuffleQuestions(false);',
+ '  form.addTextItem().setTitle("Nombre y apellido").setRequired(true);',
+ '  form.addTextItem().setTitle("Curso").setRequired(true);',
+ '  form.addTextItem().setTitle("Número de lista").setRequired(true);',
+ '  form.addTextItem().setTitle("Correo electrónico").setRequired(true);',
+ '  preguntas.forEach(function(q) {',
+ '    let item;',
+ '    if (q.tipo === "short") {',
+ '      item = form.addParagraphTextItem();',
+ '    } else {',
+ '      item = q.tipo === "multi" ? form.addCheckboxItem() : form.addMultipleChoiceItem();',
+ '      item.setChoices(q.opciones.map(function(op, i) { return item.createChoice(op, q.correcta.indexOf(i) !== -1); }));',
+ '    }',
+ '    item.setTitle(q.numero + ". " + q.enunciado).setPoints(q.puntos).setRequired(false);',
+ '  });',
+ '  const libro = SpreadsheetApp.create("Especificaciones - " + tituloEvaluacion);',
+ '  const hoja = libro.getSheets()[0];',
+ '  hoja.setName("Tabla de especificaciones");',
+ '  const seguro = function(v) { return typeof v === "string" && /^[=+@-]/.test(v) ? "\\x27" + v : v; };',
+ '  const filas = [["Pregunta"].concat(dimensionesEvaluacion).concat(["Puntaje"])];',
+ '  tablaEspecificaciones.forEach(function(r,i) { filas.push([r.pregunta].concat(r.categorias).concat([preguntas[i].puntos])); });',
+ '  hoja.getRange(1, 1, filas.length, 5).setValues(filas.map(r => r.map(seguro)));',
+ '  hoja.setFrozenRows(1);',
+ '  hoja.getRange(1, 1, 1, 5).setFontWeight("bold");',
+ '  hoja.autoResizeColumns(1,5);',
+ '  Logger.log("Editar formulario: " + form.getEditUrl());',
+ '  Logger.log("Enlace estudiantes: " + form.getPublishedUrl());',
+ '  Logger.log("Tabla de especificaciones: " + libro.getUrl());',
+ '}',''].join('\n');
+}
