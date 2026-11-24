@@ -462,6 +462,124 @@ function downloadCsv(name,rows){const content='\ufeff'+rows.map(row=>row.map(csv
 function exportSummary(){const e=state.exam,s=state.snapshot;const rows=[['Estudiante','Curso','Número de lista','Correo electrónico','Situación','Puntaje selección','Puntaje máximo selección','Preguntas abiertas pendientes','Pestaña oculta (eventos)','Salida de pantalla completa (eventos)','Pérdidas de foco (eventos)','Ingreso','Entrega']];for(const st of s.students){const x=scoring(st,s,state.questions);rows.push([st.name,st.curso||'',st.numero_lista??'',st.email||'',statusStudent(st,e),x.auto,x.max,x.open,countEvents(st,s,'hidden'),countEvents(st,s,'fullscreen_exit'),countEvents(st,s,'blur'),fmt(st.joined_at),fmt(st.submitted_at)])}downloadCsv(`resumen_${e.code}.csv`,rows)}
 function exportDetail(){const e=state.exam,s=state.snapshot;const rows=[['Estudiante','Curso','Número de lista','Correo electrónico','Pregunta','Tipo','Enunciado','Respuesta','Puntos máximos','Respuesta correcta (pauta)','Fecha guardado']];for(const st of s.students)for(let i=0;i<state.questions.length;i++){const q=state.questions[i],a=s.answers.find(a=>a.participant_id===st.id&&a.question_id===q.id);const readable=val=>val===undefined||val===null?'':q.kind==='short'?String(val):Array.isArray(val)?val.map(n=>q.options?.[Number(n)]||'').join(' / '):q.options?.[Number(val)]||'';rows.push([st.name,st.curso||'',st.numero_lista??'',st.email||'',i+1,q.kind,q.prompt,a?readable(a.response):'',q.points,q.kind==='short'?'Corrección manual':q.correct.map(n=>q.options?.[Number(n)]||'').join(' / '),a?fmt(a.saved_at):''])}downloadCsv(`respuestas_${e.code}.csv`,rows)}
 
+
+/* v5 · Informes docentes: el análisis no se entrega al estudiante automáticamente. */
+let currentPedReport=null;
+let currentPedIndividual=null;
+let pedGradeReady=false;
+const percentage=v=>v===null||!Number.isFinite(v)?'—':num(v)+' %';
+function pedText(v){return esc(v??'')}
+function pedBar(v){return v===null?'': '<span class="ped-bar"><i style="width:'+Math.max(0,Math.min(100,v))+'%"></i></span>'}
+async function openPedagogicalPanel(){
+ if(!state.teacher&&!isDemo)return;
+ setView('pedagogy');app.innerHTML='<div class="loading">Cargando análisis pedagógico…</div>';
+ try{
+  state.questions=await teacherQuestions(state.exam);
+  state.snapshot=await teacherSnapshot(state.exam);
+  if(isDemo){pedagogicalGrades=[];pedGradeReady=false}
+  else{
+   const ids=state.questions.filter(q=>q.kind==='short').map(q=>q.id);
+   if(ids.length&&pedagogy.ready){const r=await supa.from('qx_manual_scores').select('participant_id,question_id,points').in('question_id',ids);if(r.error){if(!missingPedagogy(r.error))throw r.error;pedagogicalGrades=[];pedGradeReady=false}else{pedagogicalGrades=r.data||[];pedGradeReady=true}}
+   else{pedagogicalGrades=[];pedGradeReady=!!pedagogy.ready}
+  }
+  renderPedagogy();
+ }catch(e){err(e);await dashboard()}
+}
+function pedFeedbackHTML(report){
+ const f=feedback(report);
+ const list=(groups,empty)=>groups.length?'<ul>'+groups.map(g=>'<li>'+pedText(g.dimension)+' · '+pedText(g.name)+' — '+percentage(g.pct)+' ('+g.questions.length+' ítem(s), '+g.n+' respuestas corregidas)</li>').join('')+'</ul>':'<p>'+empty+'</p>';
+ return '<section class="ped-report-section"><h2>Retroalimentación pedagógica</h2><p>'+pedText(f.summary)+'</p><h3>Fortalezas</h3>'+list(f.strengths,'No se identificaron categorías que alcancen el umbral superior, o faltan datos.')+'<h3>Aprendizajes por reforzar</h3>'+list(f.needs,'No se identificaron categorías bajo el umbral inferior, o faltan datos.')+'<h3>Preguntas prioritarias</h3>'+(f.priority.length?'<ul>'+f.priority.map(i=>'<li>Pregunta '+i.number+' · '+percentage(i.pct)+' — '+pedText(i.q.prompt)+'</li>').join('')+'</ul>':'<p>No hay preguntas bajo el umbral inferior con puntaje calculable.</p>')+'<h3>Recomendaciones</h3><p>'+pedText(f.recommendation)+'</p><p class="hint">Los porcentajes describen desempeño en los ítems evaluados; no prueban causas ni equivalen por sí solos a dominio estable. Considera el número de ítems y las entregas pendientes.</p></section>';
+}
+function pedDimensionsHTML(r){
+ return '<section class="ped-report-section"><h2>Logro por dimensión</h2>'+r.dimensions.map(d=>'<h3>'+pedText(d.name)+'</h3>'+(d.groups.length?'<div class="table-wrap"><table><thead><tr><th>Categoría</th><th>Preguntas</th><th>Puntos</th><th>Logro</th></tr></thead><tbody>'+d.groups.map(g=>'<tr><td>'+pedText(g.name)+'</td><td>'+g.questions.join(', ')+'</td><td>'+num(g.earned)+' / '+num(g.max)+'</td><td>'+percentage(g.pct)+pedBar(g.pct)+'</td></tr>').join('')+'</tbody></table></div>':'<p class="hint">Sin categorías corregidas en esta dimensión.</p>')).join('')+'</section>';
+}
+function pedSpecsHTML(){
+ return '<section class="ped-report-section"><h2>Tabla de especificaciones</h2><div class="table-wrap"><table><thead><tr><th>Pregunta</th>'+dimensionsOf(pedagogy.dimensions).map(d=>'<th>'+pedText(d)+'</th>').join('')+'<th>Puntaje</th></tr></thead><tbody>'+state.questions.map((q,i)=>'<tr><td>'+(i+1)+'</td>'+tagsOf(q.categories).map(c=>'<td>'+pedText(c||'—')+'</td>').join('')+'<td>'+num(q.points)+'</td></tr>').join('')+'</tbody></table></div></section>';
+}
+function pedItemsHTML(r){
+ return '<section class="ped-report-section"><h2>Análisis por pregunta y alternativa</h2>'+r.items.map(it=>{
+  const q=it.q;
+  const choices=q.kind==='short'?'':(q.options||[]).map((o,j)=>'<div class="ped-choice"><span>'+String.fromCharCode(65+j)+'. '+pedText(o)+((q.correct||[]).map(Number).includes(j)?' <b>(Correcta)</b>':'')+'</span><b>'+it.counts[j]+' · '+percentage(r.submitted?100*it.counts[j]/r.submitted:null)+'</b></div>').join('');
+  return '<details class="ped-item"><summary>Pregunta '+it.number+' · '+percentage(it.pct)+' · '+it.blank+' en blanco · '+it.pending+' por corregir</summary><p>'+pedText(q.prompt)+'</p><p class="hint">Puntos corregidos: '+num(it.earned)+' / '+num(it.max)+' · '+it.graded+' respuestas corregidas.</p>'+choices+(q.kind==='multi'?'<p class="hint">En selección múltiple los porcentajes pueden sumar más de 100 %.</p>':'')+'</details>';
+ }).join('')+'</section>';
+}
+function pedLessonHTML(r){
+ const mins=pedagogicalLessonMinutes;
+ const f=feedback(r),parts=[.1,.2,.25,.35,.1].map(x=>Math.floor(mins*x));parts[4]+=mins-parts.reduce((a,b)=>a+b,0);
+ const steps=['Comunicar los resultados y el propósito del reforzamiento.','Revisar '+(f.priority.length?'las preguntas '+f.priority.map(i=>i.number).join(', '):'los ítems de menor logro')+' y comparar respuestas sin identificar estudiantes.','Modelar procedimientos de resolución y fundamentación.','Aplicar nuevas preguntas o tareas del mismo aprendizaje; revisar en parejas o individualmente.','Aplicar una pregunta de salida y registrar los aprendizajes que todavía requieren apoyo.'];
+ return '<section class="ped-report-section"><h2>Propuesta de clase de retroalimentación · '+mins+' min</h2><div class="table-wrap"><table><thead><tr><th>Etapa</th><th>Minutos</th><th>Actividad sugerida</th></tr></thead><tbody>'+['Presentación','Análisis de errores','Modelamiento','Aplicación','Verificación'].map((n,i)=>'<tr><td>'+n+'</td><td>'+parts[i]+'</td><td>'+pedText(steps[i])+'</td></tr>').join('')+'</tbody></table></div><p class="hint">Propuesta editable mediante impresión o adaptación docente; requiere seleccionar textos y actividades apropiados para el curso.</p></section>';
+}
+function pedManualHTML(student){
+ if(!student)return '';
+ const qs=state.questions.filter(q=>q.kind==='short');
+ if(!qs.length)return '';
+ const map=new Map(pedagogicalGrades.map(g=>[g.participant_id+'|'+g.question_id,g.points]));
+ return '<section class="card ped-no-print"><h2>Corrección de preguntas abiertas</h2>'+(!pedGradeReady?'<p class="notice warning">Activa la migración v5 para guardar los puntajes.</p>':'')+qs.map(q=>{
+  const i=state.questions.indexOf(q),val=map.get(student.id+'|'+q.id);
+  const answer=state.snapshot.answers.find(a=>a.participant_id===student.id&&a.question_id===q.id)?.response;
+  return '<div class="ped-manual"><h3>Pregunta '+(i+1)+' · '+num(q.points)+' puntos</h3><p>'+pedText(q.prompt)+'</p><div class="notice" style="white-space:pre-wrap">'+pedText(answer??'Sin respuesta')+'</div><div class="btn-row"><input type="number" min="0" max="'+Number(q.points)+'" step="0.01" id="ped-grade-'+esc(q.id)+'" value="'+esc(val??'')+'" placeholder="Pendiente" '+(!pedGradeReady?'disabled':'')+'><button class="btn btn-outline small" data-action="ped-grade" data-qid="'+esc(q.id)+'" data-stid="'+esc(student.id)+'" '+(!pedGradeReady?'disabled':'')+'>Guardar puntaje</button></div></div>';
+ }).join('')+'</section>';
+}
+function pedReportHTML(r,scope){
+ const d=r.distribution;
+ return '<div id="ped-print-report"><section class="ped-report-section"><div class="eyebrow">Informe pedagógico · AulaPrueba B-13</div><h1>'+pedText(state.exam.title)+'</h1><p><b>'+pedText(scope)+'</b> · '+esc(new Date().toLocaleDateString('es-CL'))+'</p><div class="ped-kpis"><div><span>Logro sobre puntos corregidos</span><strong>'+percentage(r.pct)+'</strong></div><div><span>Entregas / inscritos</span><strong>'+r.submitted+' / '+r.enrolled+'</strong></div><div><span>Puntos corregidos</span><strong>'+num(r.earned)+' / '+num(r.max)+'</strong></div><div><span>Preguntas categorizadas</span><strong>'+r.classified+' / '+r.questionCount+'</strong></div></div>'+
+ (r.pending?'<p class="notice warning">Informe provisional: '+r.pending+' respuestas o pautas pendientes de corrección. No se incluyen en el denominador corregido ni en la clasificación individual definitiva.</p>':'')+
+ '<p class="hint">Se incluyen únicamente entregas confirmadas. Las respuestas omitidas en ítems cerrados se puntúan con cero. Cada dimensión se calcula por separado; no se suman porcentajes entre dimensiones.</p><h3>Niveles de logro (evaluaciones completas y corregidas)</h3><div class="ped-kpis"><div>Logrado ≥ '+r.high+' % <strong>'+d.high+'</strong></div><div>En desarrollo ≥ '+r.low+' % y &lt; '+r.high+' % <strong>'+d.middle+'</strong></div><div>Por reforzar &lt; '+r.low+' % <strong>'+d.low+'</strong></div><div>Sin clasificación definitiva <strong>'+d.excluded+'</strong></div></div></section>'+pedDimensionsHTML(r)+pedFeedbackHTML(r)+(currentPedIndividual?'':pedLessonHTML(r))+pedItemsHTML(r)+pedSpecsHTML()+'</div>';
+}
+function renderPedagogy(){
+ if(state.view!=='pedagogy')return;
+ const all=state.snapshot.students||[],courses=[...new Set(all.map(st=>st.curso||'Sin curso registrado'))].sort();
+ if(pedagogicalFilter&&!courses.includes(pedagogicalFilter))pedagogicalFilter='';
+ const pool=all.filter(st=>!pedagogicalFilter||(st.curso||'Sin curso registrado')===pedagogicalFilter);
+ const individual=pool.find(st=>st.id===pedagogicalStudent&&st.submitted_at);
+ currentPedIndividual=individual||null;
+ const chosen=individual?[individual]:pool;
+ const report=analyze(state.questions,chosen,state.snapshot.answers||[],pedagogicalGrades,pedagogy.dimensions,pedagogicalLow,pedagogicalHigh);currentPedReport=report;
+ const scope=individual?'Informe individual · '+individual.name+' · '+(individual.curso||'Sin curso'):pedagogicalFilter?'Informe del curso · '+pedagogicalFilter:'Informe general · todos los cursos inscritos';
+ app.innerHTML='<div class="subhead ped-no-print"><div><div class="eyebrow">Área docente · Análisis pedagógico</div><h1>Resultados y retroalimentación</h1></div><button class="btn btn-outline" data-action="ped-back">← Supervisión</button></div>'+
+ (!pedagogy.ready?'<p class="notice warning">La migración v5 aún no está activa. Se puede analizar la corrección automática existente, pero no guardar categorías ni corregir respuestas abiertas.</p>':'')+
+ '<div class="card ped-controls ped-no-print"><div class="ped-category-grid"><div class="field"><label>Curso</label><select id="ped-course"><option value="">Todos los cursos</option>'+courses.map(c=>'<option value="'+esc(c)+'" '+(c===pedagogicalFilter?'selected':'')+'>'+esc(c)+'</option>').join('')+'</select></div><div class="field"><label>Estudiante</label><select id="ped-student"><option value="">Curso completo</option>'+pool.filter(st=>st.submitted_at).map(st=>'<option value="'+esc(st.id)+'" '+(st.id===pedagogicalStudent?'selected':'')+'>'+esc(st.name)+' · '+esc(st.numero_lista??'')+'</option>').join('')+'</select></div><div class="field"><label>Umbral inferior (%)</label><input id="ped-low" type="number" min="0" max="100" value="'+pedagogicalLow+'"></div><div class="field"><label>Umbral superior (%)</label><input id="ped-high" type="number" min="0" max="100" value="'+pedagogicalHigh+'"></div><div class="field"><label>Clase de retroalimentación (min)</label><input id="ped-minutes" type="number" min="10" max="180" value="'+pedagogicalLessonMinutes+'"></div></div><div class="btn-row"><button class="btn btn-green small" data-action="ped-apply-filters">Aplicar filtros</button><button class="btn btn-outline small" data-action="ped-refresh">Actualizar resultados</button><button class="btn btn-outline small" data-action="ped-print">Imprimir / guardar PDF</button><button class="btn btn-outline small" data-action="ped-csv">Exportar CSV pedagógico</button>'+(individual?'<button class="btn btn-outline small" data-action="ped-email" '+(!individual.email?'disabled':'')+'>Preparar correo de retroalimentación</button>':'')+'</div></div>'+
+ pedManualHTML(individual)+pedReportHTML(report,scope)+
+ (!individual&&report.individual.length?'<section class="card ped-no-print"><h2>Resultados individuales</h2><div class="table-wrap"><table><thead><tr><th>Estudiante</th><th>Curso</th><th>Logro corregido</th><th>Pendientes</th><th></th></tr></thead><tbody>'+report.individual.map(i=>'<tr><td>'+pedText(i.student.name)+'</td><td>'+pedText(i.student.curso||'—')+'</td><td>'+percentage(i.pct)+'</td><td>'+i.pending+'</td><td><button class="btn btn-outline small" data-action="ped-individual" data-id="'+esc(i.student.id)+'">Ver informe</button></td></tr>').join('')+'</tbody></table></div></section>':'');
+}
+function pedApplyFilters(){
+ const low=Number($('#ped-low').value),high=Number($('#ped-high').value),mins=Number($('#ped-minutes').value);
+ if(!Number.isFinite(low)||!Number.isFinite(high)||low<0||high>100||low>=high)throw Error('El umbral inferior debe ser menor al superior, entre 0 y 100.');
+ if(!Number.isInteger(mins)||mins<10||mins>180)throw Error('La duración de clase debe estar entre 10 y 180 minutos.');
+ pedagogicalLow=low;pedagogicalHigh=high;pedagogicalLessonMinutes=mins;
+ const course=$('#ped-course').value;if(course!==pedagogicalFilter)pedagogicalStudent='';else pedagogicalStudent=$('#ped-student').value;
+ pedagogicalFilter=course;renderPedagogy();
+}
+async function pedSaveGrade(stid,qid){
+ const field=$('#ped-grade-'+qid),q=state.questions.find(x=>x.id===qid),st=state.snapshot.students.find(x=>x.id===stid&&x.submitted_at);
+ if(!field||!q||q.kind!=='short'||!st||!pedGradeReady)throw Error('No se puede registrar el puntaje.');
+ const raw=field.value.trim();
+ if(raw===''){check(await supa.from('qx_manual_scores').delete().eq('participant_id',stid).eq('question_id',qid));}
+ else{const pts=Number(raw);if(!Number.isFinite(pts)||pts<0||pts>Number(q.points))throw Error('Puntaje fuera de rango');check(await supa.from('qx_manual_scores').upsert({participant_id:stid,question_id:qid,points:pts},{onConflict:'participant_id,question_id'}));}
+ await openPedagogicalPanel();toast('Corrección guardada.');
+}
+function pedCSV(){
+ const r=currentPedReport;if(!r)return;
+ const rows=[['Tipo','Estudiante / dimensión','Categoría / pregunta','Puntos obtenidos','Puntos máximos corregidos','Logro %','Pendientes','Detalle']];
+ for(const i of r.individual)rows.push(['Individual',i.student.name,i.student.curso||'',i.earned,i.max,i.pct??'',i.pending,'']);
+ for(const d of r.dimensions)for(const g of d.groups)rows.push(['Dimensión',d.name,g.name,g.earned,g.max,g.pct??'','',g.questions.join(', ')]);
+ for(const it of r.items)rows.push(['Pregunta','',it.number,it.earned,it.max,it.pct??'',it.pending,it.q.prompt]);
+ downloadCsv('analisis_'+state.exam.code+'.csv',rows);
+}
+function pedPrint(){
+ const root=$('#ped-print-report');if(!root)return;
+ const expanded=[...root.querySelectorAll('details')].filter(x=>!x.open);expanded.forEach(x=>x.open=true);
+ window.print();expanded.forEach(x=>x.open=false);
+}
+function pedEmail(){
+ const st=currentPedIndividual,r=currentPedReport;if(!st||!st.email||!r)throw Error('Selecciona un estudiante con correo.');
+ if(r.pending&&!confirm('El informe contiene correcciones pendientes. ¿Preparar igualmente un correo provisional?'))return;
+ if(!confirm('Comprueba que '+st.email+' pertenece a '+st.name+'. ¿Preparar el correo para revisarlo antes de enviarlo?'))return;
+ const f=feedback(r);
+ const body=['AulaPrueba B-13 — '+state.exam.title,'Estudiante: '+st.name,f.summary,...r.dimensions.flatMap(d=>[d.name+':',...d.groups.map(g=>g.name+': '+percentage(g.pct))]),'Fortalezas: '+(f.strengths.map(g=>g.name+' ('+percentage(g.pct)+')').join('; ')||'Sin categorías identificadas'),'Por reforzar: '+(f.needs.map(g=>g.name+' ('+percentage(g.pct)+')').join('; ')||'Sin categorías identificadas'),f.recommendation].join('\n');
+ window.location.href='mailto:'+encodeURIComponent(st.email)+'?subject='+encodeURIComponent('Retroalimentación — '+state.exam.title)+'&body='+encodeURIComponent(body);
+}
+
 /* ============================= ESTUDIANTE ============================= */
 function studentEntrance(codeOverride=null){
  setView('student-join');
@@ -632,6 +750,15 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
  if(a==='duration-preset'){const field=$('#exam-duration');if(field){field.value=b.dataset.minutes;field.focus()}return}
   if(a==='download-qr'){downloadExamQR();toast('Código QR descargado');return}
   if(a==='copy-link'){const url=examJoinUrl(state.exam);await navigator.clipboard.writeText(url);toast('Enlace de ingreso copiado');return}
+ if(a==='open-pedagogy'){pedagogicalFilter='';pedagogicalStudent='';await openPedagogicalPanel();return}
+ if(a==='ped-back'){await dashboard();return}
+ if(a==='ped-apply-filters'){pedApplyFilters();return}
+ if(a==='ped-refresh'){await openPedagogicalPanel();return}
+ if(a==='ped-individual'){pedagogicalStudent=b.dataset.id;renderPedagogy();return}
+ if(a==='ped-grade'){b.disabled=true;await pedSaveGrade(b.dataset.stid,b.dataset.qid);return}
+ if(a==='ped-csv'){pedCSV();return}
+ if(a==='ped-print'){pedPrint();return}
+ if(a==='ped-email'){pedEmail();return}
  if(a==='close-exam'){if(!confirm('¿Cerrar la prueba? Los estudiantes ya no podrán modificar respuestas.'))return;state.exam=await teacherUpdate(state.exam,{status:'closed'});renderDashboard();toast('Prueba cerrada');return}
  if(a==='inspect'){state.selectedStudent=b.dataset.id;renderDashboard(true);return}if(a==='close-inspect'){state.selectedStudent=null;renderDashboard(true);return}
  if(a==='notify-enable'){if('Notification' in window){const permission=await Notification.requestPermission();toast(permission==='granted'?'Avisos activados. Mantenga este panel abierto.':'No se otorgó permiso de notificaciones.')}return}
