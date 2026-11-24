@@ -1,3 +1,4 @@
+import {readPDF,parsePDFExam} from './pdf-import.js?v=5.3';
 import {DEFAULT_DIMENSIONS,dimensionsOf,tagsOf,categoriesFrom,analyze,feedback,parseSpecificationTable,scoreItem,generateGoogleScript} from './pedagogia.js?v=5.2';
 /* AulaPrueba B-13 — interfaz navegador. El modo demostración es local y NO comparte datos entre dispositivos. */
 const $ = s => document.querySelector(s);
@@ -248,7 +249,7 @@ function statusLabel(s){return ({draft:'Borrador',published:'Publicada',closed:'
 function draftQuestion(){return {kind:'single',prompt:'',options:['','','',''],correct:[],points:1};}
 async function newExam(){const e={title:'Nueva evaluación',description:'',code:code(),duration_minutes:60,status:'draft'};try{state.exam=await teacherCreate(e);pedagogy=await loadPedagogy(state.exam);state.questions=[];state.draft=[draftQuestion()];editor()}catch(ex){err(ex)}}
 async function openExam(id){const exam=state.exams.find(x=>x.id===id)||state.exam;if(!exam)return;state.exam=exam;try{state.questions=await teacherQuestions(exam);state.draft=copy(state.questions);if(exam.status==='draft'){if(!state.draft.length)state.draft=[draftQuestion()];editor()}else dashboard()}catch(e){err(e)}}
-function editor(){setView('editor');const ex=state.exam;app.innerHTML=`<div class="subhead"><div><div class="eyebrow">Editor de pruebas · Borrador</div><h1>Configurar evaluación</h1></div><button class="btn btn-ghost" data-action="teacher-list">← Mis evaluaciones</button></div><div class="ped-import-grid">${examImportHTML()}${specEditorHTML()}</div><div class="form-columns"><section><div class="card" style="margin-bottom:19px"><div class="field"><label for="exam-title">Título de la evaluación</label><input id="exam-title" maxlength="200" value="${esc(ex.title)}" /></div><div class="field"><label for="exam-description">Instrucciones para los estudiantes</label><textarea id="exam-description">${esc(ex.description)}</textarea></div><div class="field"><label for="exam-duration">Tiempo máximo para rendir la prueba (minutos)</label><input type="number" min="1" max="300" id="exam-duration" value="${ex.duration_minutes}" /><p class="hint">De 1 a 300 minutos. Comienza con el primer ingreso de cada estudiante y no se reinicia al actualizar la página. Al finalizar, se bloquean las respuestas y se registra la entrega.</p><div class="btn-row exam-duration-presets"><button type="button" class="btn btn-outline small" data-action="duration-preset" data-minutes="30">30 min</button><button type="button" class="btn btn-outline small" data-action="duration-preset" data-minutes="45">45 min</button><button type="button" class="btn btn-outline small" data-action="duration-preset" data-minutes="60">60 min</button><button type="button" class="btn btn-outline small" data-action="duration-preset" data-minutes="90">90 min</button><button type="button" class="btn btn-outline small" data-action="duration-preset" data-minutes="120">120 min</button></div></div><div class="field"><label>Código de acceso</label><span class="code">${esc(ex.code)}</span></div></div><div class="subhead"><h2 class="section-title" style="margin:0">Preguntas <span class="pill">${state.draft.length}</span></h2><button class="btn btn-outline small" data-action="add-question">+ Añadir pregunta</button></div><div class="stack" id="question-editors">${state.draft.map(questionEditorHTML).join('')}</div><div class="btn-row" style="margin-top:22px"><button class="btn btn-outline" data-action="save-draft">Guardar borrador</button><button class="btn btn-green" data-action="publish">Guardar y publicar</button></div></section><aside>${scriptExportCard()}<div class="notice warning" style="margin-top:15px">Los PDF deben contener texto seleccionable. Revisa las preguntas, sus alternativas, la pauta y las categorías antes de publicar.</div></aside></div>`;insertExamQR(ex);}
+function editor(){setView('editor');const ex=state.exam;app.innerHTML=`<div class="subhead"><div><div class="eyebrow">Editor de pruebas · Borrador</div><h1>Configurar evaluación</h1></div><button class="btn btn-ghost" data-action="teacher-list">← Mis evaluaciones</button></div><div class="ped-import-grid">${examImportHTML()}${specEditorHTML()}</div><div class="form-columns"><section><div class="card" style="margin-bottom:19px"><div class="field"><label for="exam-title">Título de la evaluación</label><input id="exam-title" maxlength="200" value="${esc(ex.title)}" /></div><div class="field"><label for="exam-description">Instrucciones para los estudiantes</label><textarea id="exam-description">${esc(ex.description)}</textarea></div><div class="field"><label for="exam-duration">Tiempo máximo para rendir la prueba (minutos)</label><input type="number" min="1" max="300" id="exam-duration" value="${ex.duration_minutes}" /><p class="hint">De 1 a 300 minutos. Comienza con el primer ingreso de cada estudiante y no se reinicia al actualizar la página. Al finalizar, se bloquean las respuestas y se registra la entrega.</p><div class="btn-row exam-duration-presets"><button type="button" class="btn btn-outline small" data-action="duration-preset" data-minutes="30">30 min</button><button type="button" class="btn btn-outline small" data-action="duration-preset" data-minutes="45">45 min</button><button type="button" class="btn btn-outline small" data-action="duration-preset" data-minutes="60">60 min</button><button type="button" class="btn btn-outline small" data-action="duration-preset" data-minutes="90">90 min</button><button type="button" class="btn btn-outline small" data-action="duration-preset" data-minutes="120">120 min</button></div></div><div class="field"><label>Código de acceso</label><span class="code">${esc(ex.code)}</span></div></div><div class="subhead"><h2 class="section-title" style="margin:0">Preguntas <span class="pill">${state.draft.length}</span></h2><button class="btn btn-outline small" data-action="add-question">+ Añadir pregunta</button></div><div class="stack" id="question-editors">${state.draft.map(questionEditorHTML).join('')}</div><div class="btn-row" style="margin-top:22px"><button class="btn btn-outline" data-action="save-draft">Guardar borrador</button><button class="btn btn-green" data-action="publish">Guardar y publicar</button></div></section><aside>${scriptExportCard()}<div class="notice warning" style="margin-top:15px">Los PDF digitales y escaneados se procesan en el navegador. Revisa el texto, las imágenes no extraídas, las preguntas, la pauta y las categorías. El OCR puede cometer errores.</div></aside></div>`;insertExamQR(ex);}
 function questionEditorHTML(q,i){const options=Array.isArray(q.options)?q.options:[];const correct=Array.isArray(q.correct)?q.correct.map(x=>Number(x)+1).join(', '):'';return `<article class="question-editor" data-q="${i}"><div class="editor-top"><h3>Pregunta ${i+1}</h3><button class="btn btn-ghost small" data-action="remove-question" data-i="${i}">Eliminar</button></div><div class="field"><label>Enunciado</label><textarea data-field="prompt" placeholder="Escriba el enunciado">${esc(q.prompt)}</textarea></div><div class="editor-grid"><div class="field"><label>Tipo de pregunta</label><select data-field="kind"><option value="single" ${q.kind==='single'?'selected':''}>Selección única</option><option value="multi" ${q.kind==='multi'?'selected':''}>Selección múltiple</option><option value="short" ${q.kind==='short'?'selected':''}>Respuesta abierta</option></select></div><div class="field"><label>Puntaje</label><input type="number" min="0" max="100" step="0.5" data-field="points" value="${esc(q.points)}" /></div></div><div class="field choice-config ${q.kind==='short'?'hidden':''}"><label>Alternativas (una por línea)</label><textarea data-field="options" rows="5" placeholder="Alternativa A&#10;Alternativa B&#10;Alternativa C">${esc(options.join('\n'))}</textarea><span class="hint">Sin letras A, B, C ni numeración. Se agregarán automáticamente.</span></div><div class="field choice-config ${q.kind==='short'?'hidden':''}"><label>Alternativa(s) correcta(s)</label><input data-field="correct" value="${esc(correct)}" placeholder="Ej.: 2, o 1, 3 para selección múltiple" /><span class="hint">Ingrese el número de la alternativa, comenzando por 1. Es obligatorio antes de publicar.</span></div>${categoryFields(q)}</article>`;}
 function collectDraft(){const container=$('#question-editors');if(!container)return;pedagogy.dimensions=dimensionsOf([0,1,2].map(i=>$('#ped-dim-'+i)?.value||pedagogy.dimensions[i]));state.exam={...state.exam,title:$('#exam-title')?.value??state.exam.title,description:$('#exam-description')?.value??state.exam.description,duration_minutes:Number($('#exam-duration')?.value??state.exam.duration_minutes)};state.draft=[...container.querySelectorAll('[data-q]')].map(node=>{const get=k=>node.querySelector(`[data-field="${k}"]`)?.value??'';let options=get('options').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);let kind=get('kind');let correct=[...new Set(get('correct').split(/[,;\s]+/).map(x=>Number(x)).filter(n=>Number.isInteger(n)&&n>0).map(n=>n-1))].sort((a,b)=>a-b);return {kind,prompt:get('prompt').trim(),points:Number(get('points')),options:kind==='short'?[]:options,correct:kind==='short'?[]:correct,categories:tagsOf([0,1,2].map(i=>get('category-'+i)))}});state.importText=$('#script-input')?.value||state.importText;}
 function validateDraft(publicar=false){const title=$('#exam-title')?.value.trim()||state.exam.title,minutes=Number($('#exam-duration')?.value);if(title.length<3)throw Error('Escriba un título de al menos 3 caracteres');if(!Number.isInteger(minutes)||minutes<1||minutes>300)throw Error('La duración debe estar entre 1 y 300 minutos');if(publicar&&!state.draft.length)throw Error('Añada al menos una pregunta');for(let i=0;i<state.draft.length;i++){const q=state.draft[i];if(!q.prompt)throw Error(`Falta el enunciado de la pregunta ${i+1}`);if(!Number.isFinite(q.points)||q.points<0||q.points>100)throw Error(`Puntaje inválido en pregunta ${i+1}`);if(q.kind!=='short'){if(q.options.length<2||q.options.length>10)throw Error(`La pregunta ${i+1} necesita entre 2 y 10 alternativas`);if(q.correct.some(n=>n>=q.options.length))throw Error(`Revise la pauta de la pregunta ${i+1}`);if(publicar&&q.correct.length===0)throw Error(`Indique la alternativa correcta en la pregunta ${i+1}`);if(q.kind==='single'&&q.correct.length>1)throw Error(`La pregunta ${i+1} solo admite una respuesta correcta`)}}}
@@ -397,21 +398,21 @@ for(let i=0;i<headers.length;i++){const h=headers[i], chunk=src.slice(h.index+(h
 if(choices)opts=quotedStrings(choices[1]);else{const choiceR=/\.createChoice\s*\(\s*(['"`])((?:\\[\s\S]|(?!\1)[\s\S])*?)\1\s*(?:,\s*(true|false))?\s*\)/g;for(const match of chunk.matchAll(choiceR)){opts.push(decodeJS(match[2]));if(match[3]==='true')correct.push(opts.length-1)}}
 const pt=chunk.match(/\.setPoints\s*\(\s*(\d+(?:\.\d+)?)\s*\)/);qs.push({kind,prompt:decodeJS(titleChunk[2]),options:kind==='short'?[]:opts,correct,points:pt?Number(pt[1]):1})}
 return mergeScriptSpecs(qs.filter(q=>q.kind==='short'||q.options.length>=2),src);}
-async function pdfRead(file,tableMode=false){if(file.size>15*1024*1024)throw Error('PDF demasiado grande (máximo 15 MB)');const pdfjs=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.mjs');pdfjs.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.mjs';const buf=await file.arrayBuffer();const pdf=await pdfjs.getDocument({data:buf}).promise;if(pdf.numPages>100)throw Error('Este importador admite PDF de hasta 100 páginas');let text='';for(let i=1;i<=pdf.numPages;i++){const page=await pdf.getPage(i),tc=await page.getTextContent(),rows=new Map();for(const it of tc.items){if(!it.str)continue;const y=Math.round(it.transform?.[5]||0),x=it.transform?.[4]||0;let row=rows.get(y);if(!row){row=[];rows.set(y,row)}row.push({x,s:it.str,w:Number(it.width)||0})}text+=[...rows.entries()].sort((a,b)=>b[0]-a[0]).map(([y,r])=>{r.sort((a,b)=>a.x-b.x);let out='',end=null;for(const it of r){out+=(end===null?'':tableMode&&it.x-end>=9?'\t':' ')+it.s;end=Math.max(end??it.x,it.x+it.w)}return out.trim()}).join('\n')+'\n'}return text;}
 function addImported(items,source){if(!items.length)throw Error('No se detectaron preguntas compatibles. Revise el formato y agréguelas manualmente');collectDraft();if(state.draft.length===1&&!state.draft[0].prompt)state.draft=[];state.draft.push(...items.slice(0,100-state.draft.length));editor();toast(`${items.length} pregunta(s) importadas desde ${source}. Revise cada alternativa y su pauta.`,6000);}
 
 
 
 /* v5.1 — dos entradas de archivos independientes. */
 let importBusy=false;
+let pendingPdf=null;
 const importStatus={exam:null,spec:null};
 function dropZoneHTML(kind){
  const exam=kind==='exam',id='drop-file-'+kind,accept=exam?'.pdf,.gs,.js,.txt,application/pdf,text/plain':'.pdf,.csv,.tsv,.txt,application/pdf,text/csv,text/plain';
  const status=importStatus[kind]?.examId===state.exam?.id?importStatus[kind]:null;
- return '<div class="file-drop-area" data-drop-kind="'+kind+'"><div class="file-drop-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V3M7 8l5-5 5 5M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></svg></div><strong>Arrastra y suelta '+(exam?'la prueba':'la tabla de especificaciones')+'</strong><span class="hint">'+(exam?'PDF digital o Google Apps Script (.gs, .js, .txt)':'PDF digital, CSV, TSV o texto delimitado (.txt)')+'</span><label for="'+id+'" class="btn btn-outline small">Seleccionar archivo</label><input id="'+id+'" data-import-kind="'+kind+'" type="file" accept="'+accept+'" class="hidden-file"><p class="file-drop-status'+(status?.error?' file-drop-error':'')+'" role="status" aria-live="polite">'+esc(status?.message||'Ningún archivo cargado')+'</p></div>';
+ return '<div class="file-drop-area" data-drop-kind="'+kind+'"><div class="file-drop-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V3M7 8l5-5 5 5M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></svg></div><strong>Arrastra y suelta '+(exam?'la prueba':'la tabla de especificaciones')+'</strong><span class="hint">'+(exam?'PDF digital o escaneado · Apps Script (.gs, .js, .txt)':'PDF digital o escaneado, CSV, TSV o TXT')+'</span><label for="'+id+'" class="btn btn-outline small">Seleccionar archivo</label><input id="'+id+'" data-import-kind="'+kind+'" type="file" accept="'+accept+'" class="hidden-file"><p class="file-drop-status'+(status?.error?' file-drop-error':'')+'" role="status" aria-live="polite">'+esc(status?.message||'Ningún archivo cargado')+'</p></div>';
 }
 function scriptExportCard(){
- return '<section class="import-card" style="margin-top:15px"><div class="eyebrow">Exportación · Google Forms</div><h3>Generar Google Apps Script</h3><p class="hint">Convierte la evaluación y sus tres dimensiones en un script que crea un cuestionario y una hoja de especificaciones independiente.</p><button class="btn btn-green small" data-action="generate-script">Generar script</button><div id="script-export-result"></div></section>';
+ return '<section class="import-card" style="margin-top:15px"><div class="eyebrow">Exportación · Google Forms</div><h3>Generar Google Apps Script</h3><p class="hint">Después de incorporar el PDF y revisar las respuestas correctas y categorías, genera el script de la evaluación y su tabla de especificaciones.</p><button class="btn btn-green small" data-action="generate-script">Generar script</button><div id="script-export-result"></div></section>';
 }
 function showScriptExport(code,title){
  const root=$('#script-export-result')||app.querySelector('.exam-script-modal');
@@ -430,7 +431,7 @@ async function exportSavedExamScript(id){
  finally{pedagogy=previous}
 }
 function examImportHTML(){
- return '<section class="import-card"><div class="eyebrow">01 · Evaluación</div><h3>Importar prueba</h3><p class="hint">Carga aquí el instrumento con las preguntas. Si es un script, también puede incluir las respuestas correctas.</p>'+dropZoneHTML('exam')+'<details class="ped-import-paste"><summary>O pegar Google Apps Script</summary><textarea id="script-input" class="input" rows="5" placeholder="Pega el código de tu evaluación">'+esc(state.importText)+'</textarea><button type="button" class="btn btn-outline small" data-action="import-script">Analizar script</button></details></section>';
+ return '<section class="import-card"><div class="eyebrow">01 · Evaluación</div><h3>Importar prueba</h3><p class="hint">Carga la evaluación en PDF o script. El PDF se lee automáticamente y las páginas sin texto suficiente se procesan con OCR en español.</p>'+dropZoneHTML('exam')+'<label class="ocr-option"><input type="checkbox" id="force-pdf-ocr"> Forzar OCR en todas las páginas del PDF</label><div id="pdf-review"></div><details class="ped-import-paste"><summary>O pegar Google Apps Script</summary><textarea id="script-input" class="input" rows="5" placeholder="Pega el código de tu evaluación">'+esc(state.importText)+'</textarea><button type="button" class="btn btn-outline small" data-action="import-script">Analizar script</button></details></section>';
 }
 function setImportStatus(kind,message,error=false){
  importStatus[kind]={examId:state.exam?.id,message,error};
@@ -450,9 +451,12 @@ async function importDroppedFile(kind,file){
   if(kind==='exam'){
    let qs,importedNames=null;
    if(ext==='pdf'){
-    const text=await pdfRead(file),marker=text.search(/^\s*tabla de especificaciones\s*$/im);
-    qs=parseTextQuestions(marker>=0?text.slice(0,marker):text);
-    if(marker>=0){const tab=await pdfRead(file,true),at=tab.search(/^\s*tabla de especificaciones\s*$/im);if(at>=0)applyImportedSpecs(qs,parseSpecificationTable(tab.slice(at),pedagogy.dimensions).rows,true)}
+    const result=await readPDF(file,{forceOCR:!!$('#force-pdf-ocr')?.checked,onProgress:msg=>{if(isCurrent())setImportStatus(kind,msg)}});
+    if(!isCurrent())return;
+    pendingPdf={examId,name:file.name,...result};
+    showPDFReview(result);
+    setImportStatus(kind,file.name+' · '+result.pageCount+' página(s), '+result.ocrPages.length+' con OCR. Revisa el texto antes de incorporar.');
+    return;
    }else{
     const text=await file.text();
     qs=parseAppsScript(text);importedNames=importDimensionNames(text);
@@ -471,16 +475,53 @@ async function importDroppedFile(kind,file){
    setImportStatus(kind,file.name+' · '+count+' pregunta(s) incorporadas.'+(count<qs.length?' Límite de 100 preguntas alcanzado.':''));
    addImported(qs.slice(0,count),file.name);
   }else{
-   const text=ext==='pdf'?await pdfRead(file,true):await file.text();
+   const result=ext==='pdf'?await readPDF(file,{onProgress:msg=>{if(isCurrent())setImportStatus(kind,msg)}}):null;
+   const text=result?result.table:await file.text();
    if(!isCurrent())return;
    collectDraft();
    const parsed=parseSpecificationTable(ext==='csv'?csvToTabular(text):text,pedagogy.dimensions);
+   if(result?.ocrPages.length){
+    const area=$('#spec-table');if(area){area.value=text;area.closest('details').open=true}
+    parsed.warnings.push('Se utilizó OCR. Si las columnas no se reconocen, corrige el texto de la tabla con separadores | antes de interpretar.');
+    if(!parsed.rows.length){setImportStatus(kind,'OCR completado. Corrige los separadores de columnas en el cuadro de texto de especificaciones.',true);return}
+   }
    previewSpecImport(parsed);
    setImportStatus(kind,file.name+' · '+parsed.rows.length+' fila(s) detectadas. Revisa y aplica las categorías.');
   }
  }catch(e){if(isCurrent()){setImportStatus(kind,e.message||String(e),true);err(e)}}
  finally{importBusy=false}
 }
+
+function showPDFReview(result){
+ const root=$('#pdf-review');if(!root)return;
+ const parsed=parsePDFExam(result.text),closed=parsed.questions.filter(q=>q.kind!=='short'),keyed=closed.filter(q=>q.correct.length);
+ root.innerHTML='<div class="pdf-review-box"><h3>Revisión del PDF</h3><p class="hint">'+result.pageCount+' página(s) · '+result.ocrPages.length+' procesadas con OCR · '+parsed.questions.length+' preguntas detectadas · '+keyed.length+' / '+closed.length+' cerradas con pauta reconocida.</p><p class="hint">Revisa el texto completo y corrige los errores de lectura o numeración. Solo se incorporan pautas explícitas; las imágenes, fórmulas y columnas complejas requieren revisión. Los textos de lectura pueden requerir reorganización manual.</p><textarea class="input" rows="14" id="pdf-extracted-text">'+esc(result.text)+'</textarea><label class="ocr-option"><input type="checkbox" id="pdf-include-intro" checked> Incorporar el texto anterior a la primera pregunta a las instrucciones</label><p class="hint">El puntaje predeterminado es 1 si no se reconoce un puntaje explícito.</p>'+(parsed.warnings.length?'<p class="notice warning">'+esc(parsed.warnings.slice(0,20).join(' · '))+(parsed.warnings.length>20?' · Hay más advertencias.':'')+'</p>':'')+'<div class="btn-row"><button class="btn btn-green small" data-action="pdf-apply">Incorporar preguntas</button><button class="btn btn-outline small" data-action="pdf-cancel">Cancelar</button></div></div>';
+}
+function applyPDFReview(){
+ if(!pendingPdf||pendingPdf.examId!==state.exam.id)throw Error('Carga nuevamente el PDF.');
+ const text=$('#pdf-extracted-text')?.value??'',includeIntro=$('#pdf-include-intro')?.checked;
+ const parsed=parsePDFExam(text),qs=parsed.questions;
+ if(!qs.length)throw Error('No se reconocieron preguntas numeradas. Corrige el texto y vuelve a intentar.');
+ collectDraft();
+ const existing=state.draft.filter(q=>q.prompt.trim()).length;
+ if(existing&&!confirm('La evaluación ya contiene '+existing+' preguntas. ¿Añadir las nuevas al final?'))return;
+ const room=100-(state.draft.length===1&&!state.draft[0].prompt?0:state.draft.length);
+ if(room<=0)throw Error('Se alcanzó el máximo de 100 preguntas.');
+ const n=Math.min(room,qs.length);
+ const missing=qs.slice(0,n).filter(q=>q.kind!=='short'&&!q.correct.length).length;
+ if(parsed.warnings.length&&!confirm('Hay '+parsed.warnings.length+' advertencia(s) de lectura. Revisa las preguntas en el editor antes de generar el script. ¿Incorporarlas?'))return;
+ // Solo usar tabla incrustada si se reconoce por separado y los números coinciden.
+ const marker=pendingPdf.table.search(/^\s*tabla de especificaciones\s*$/im);
+ if(marker>=0&&text===(pendingPdf.text||'')){
+  const table=parseSpecificationTable(pendingPdf.table.slice(marker),pedagogy.dimensions);
+  if(table.rows.length)applyImportedSpecs(qs,table.rows,true);
+ }
+ if(includeIntro&&parsed.intro){const desc=$('#exam-description');if(desc)desc.value=[desc.value,parsed.intro].filter(Boolean).join('\n\n')}
+ const source=pendingPdf.name;pendingPdf=null;pendingSpecRows=[];
+ setImportStatus('exam',source+' · '+n+' preguntas incorporadas.'+(missing?' '+missing+' preguntas cerradas sin pauta: complétalas antes de generar el script.':' Revisa antes de generar el script.')+(n<qs.length?' Se alcanzó el límite de 100 preguntas.':''));
+ addImported(qs.slice(0,n),source);
+}
+
 function csvToTabular(text){
  const raw=String(text).replace(/^\ufeff/,'');
  // CSV con comillas y comas; los archivos delimitados por punto y coma o tabulador conservan su separador.
@@ -859,7 +900,9 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
  if(a==='home'){viewHome();return}if(a==='teacher'){await teacherEntrance();return}if(a==='student'){studentEntrance();return}if(a==='teacher-list'){await teacherList();return}if(a==='new-exam'){await newExam();return}if(a==='open-exam'){await openExam(b.dataset.id);return}
  if(a==='delete-exam'){b.disabled=true;try{await deleteExam(b.dataset.id)}finally{b.disabled=false}return}
  if(a==='export-exam-script'){await exportSavedExamScript(b.dataset.id);return}
- if(a==='generate-script'){collectDraft();showScriptExport(generateGoogleScript(state.exam,state.draft,pedagogy.dimensions),state.exam.title);return}
+ if(a==='pdf-apply'){applyPDFReview();return}
+ if(a==='pdf-cancel'){pendingPdf=null;$('#pdf-review').innerHTML='';setImportStatus('exam','Importación cancelada.');return}
+ if(a==='generate-script'){if(pendingPdf?.examId===state.exam.id&&$('#pdf-extracted-text'))throw Error('Incorpora o cancela el PDF pendiente antes de generar el script.');collectDraft();showScriptExport(generateGoogleScript(state.exam,state.draft,pedagogy.dimensions),state.exam.title);return}
  if(a==='copy-generated-script'){const t=$('#generated-script');if(t){await navigator.clipboard.writeText(t.value);toast('Script copiado.')}return}
  if(a==='download-generated-script'){const t=$('#generated-script');if(t){const u=URL.createObjectURL(new Blob([t.value],{type:'text/plain;charset=utf-8'}));const link=document.createElement('a');link.href=u;link.download='evaluacion-aulaprueba.gs';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(u),1000)}return}
  if(a==='close-script-export'){app.querySelector('.exam-script-modal')?.remove();return}
