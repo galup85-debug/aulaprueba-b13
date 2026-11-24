@@ -367,7 +367,7 @@ function parseQuestionsFromData(source) {
         correct = (Array.isArray(correct) ? correct : [correct]).map(normalize).filter(x => Number.isInteger(x) && x >= 0 && x < options.length);
         const points = Number(item.puntos ?? item.puntaje ?? item.points ?? 1);
         const showHeading = heading && heading !== lastHeading;
-        result.push({kind:correct.length>1?'multi':'single', prompt:(showHeading ? heading+'\n\n' : '')+prompt.trim(), options, correct, points:Number.isFinite(points)?points:1,categories:categoriesFrom(item,heading)});
+        result.push({kind:correct.length>1?'multi':'single', prompt:(showHeading ? heading+'\n\n' : '')+prompt.trim(), options, correct, points:Number.isFinite(points)?points:1,sourceNumber:Number(prompt.trim().match(/^(\d{1,3})\s*[.)\-:]/)?.[1])||undefined,categories:categoriesFrom(item,heading)});
         if (heading) lastHeading = heading;
       }
     }
@@ -401,7 +401,7 @@ function specEditorHTML(){
 function applyImportedSpecs(items,rows,bySource=false){
  let matched=0,miss=[];
  for(const row of rows){
-  const hits=bySource?items.filter((q,i)=>Number(q.sourceNumber??i+1)===row.number):items.filter((q,i)=>i+1===row.number);
+  const explicit=bySource&&items.some(q=>Number.isInteger(q.sourceNumber));const hits=bySource?items.filter((q,i)=>Number(explicit?q.sourceNumber:i+1)===row.number):items.filter((q,i)=>i+1===row.number);
   if(hits.length!==1){miss.push(row.number);continue;}
   hits[0].categories=tagsOf(row.tags);matched++;
  }
@@ -479,7 +479,7 @@ async function openPedagogicalPanel(){
   if(isDemo){pedagogicalGrades=[];pedGradeReady=false}
   else{
    const ids=state.questions.filter(q=>q.kind==='short').map(q=>q.id);
-   if(ids.length&&pedagogy.ready){const r=await supa.from('qx_manual_scores').select('participant_id,question_id,points').in('question_id',ids);if(r.error){if(!missingPedagogy(r.error))throw r.error;pedagogicalGrades=[];pedGradeReady=false}else{pedagogicalGrades=r.data||[];pedGradeReady=true}}
+   if(ids.length&&pedagogy.ready){pedagogicalGrades=[];pedGradeReady=true;for(let start=0;;start+=500){const r=await supa.from('qx_manual_scores').select('participant_id,question_id,points').in('question_id',ids).order('participant_id').order('question_id').range(start,start+499);if(r.error){if(!missingPedagogy(r.error))throw r.error;pedagogicalGrades=[];pedGradeReady=false;break}pedagogicalGrades.push(...(r.data||[]));if((r.data||[]).length<500)break}}
    else{pedagogicalGrades=[];pedGradeReady=!!pedagogy.ready}
   }
   renderPedagogy();
@@ -573,6 +573,7 @@ function pedPrint(){
 }
 function pedEmail(){
  const st=currentPedIndividual,r=currentPedReport;if(!st||!st.email||!r)throw Error('Selecciona un estudiante con correo.');
+ if(state.exam.status!=='closed'&&!confirm('La evaluación todavía está abierta. ¿Preparar el informe sin incluir la pauta ni las respuestas correctas?'))return;
  if(r.pending&&!confirm('El informe contiene correcciones pendientes. ¿Preparar igualmente un correo provisional?'))return;
  if(!confirm('Comprueba que '+st.email+' pertenece a '+st.name+'. ¿Preparar el correo para revisarlo antes de enviarlo?'))return;
  const f=feedback(r);
