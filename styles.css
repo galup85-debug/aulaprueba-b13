@@ -187,3 +187,25 @@ body{min-width:280px}
  .institutional-name{font-size:13px}
  .institutional-crest{width:43px;height:54px}
 }
+
+/* v5.0 · Pedagogía, identidad institucional y salida impresa. */
+.ped-spec{margin:16px 0}.ped-spec h3{margin-top:0}.ped-spec details textarea{display:block;width:100%;margin:10px 0;min-height:100px}.ped-spec #ped-spec-review{margin-top:14px}.ped-category-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.ped-category-grid .field{min-width:0}.ped-category-grid input,.ped-category-grid select{width:100%;min-width:0}.question-editor .ped-category-grid{border-top:1px solid #dce7eb;padding-top:14px;margin-top:16px}.ped-controls{margin:16px 0 20px}.ped-report-section{background:#fff;border:1px solid #dce7eb;border-radius:15px;padding:clamp(16px,3vw,26px);margin:16px 0}.ped-report-section h2{color:#123b4a;font-size:22px;margin:0 0 15px}.ped-report-section h3{color:#193040;font-size:16px;margin:18px 0 9px}.ped-report-section p,.ped-report-section li{line-height:1.55}.ped-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:14px 0}.ped-kpis>div{border:1px solid #dce7eb;border-radius:10px;padding:12px;background:#f7fafb;font-size:13px;overflow-wrap:anywhere}.ped-kpis strong{display:block;font-size:23px;color:#123b4a;margin-top:8px}.ped-bar{display:block;width:100%;min-width:60px;height:7px;border-radius:4px;background:#e5edf0;overflow:hidden;margin-top:6px}.ped-bar i{display:block;height:100%;background:#166782}.ped-item{border:1px solid #dce7eb;border-radius:10px;padding:12px;margin:10px 0}.ped-item summary,.ped-spec summary{cursor:pointer;font-weight:700}.ped-choice{display:flex;justify-content:space-between;gap:12px;border-top:1px solid #e8eff1;padding:9px 0;font-size:14px}.ped-choice b{flex-shrink:0}.ped-manual{padding:14px 0;border-top:1px solid #e4e9ed}.ped-manual input{max-width:140px}.ped-report-section td{vertical-align:top;overflow-wrap:anywhere}.ped-report-section table{font-size:13px}.ped-report-section .table-wrap{box-shadow:none}
+@media(max-width:760px){.ped-category-grid{grid-template-columns:1fr}.ped-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.ped-choice{flex-direction:column;gap:4px}.ped-report-section{padding:15px}}
+@media print{
+ @page{size:A4;margin:13mm}
+ html,body{background:#fff!important;color:#152b38!important;overflow:visible!important;height:auto!important}
+ .topbar.institutional-topbar{position:static!important;box-shadow:none!important;border-bottom:1px solid #cfdbe0!important;padding:0 0 8px!important;break-after:avoid}
+ .institutional-app,.top-actions,.ped-no-print,.site-footer,#toast{display:none!important}
+ .shell{max-width:none!important;margin:0!important;padding:0!important;width:100%!important;overflow:visible!important}
+ #ped-print-report{display:block!important}
+ .ped-report-section{margin:12px 0;padding:0;border:0;border-radius:0;box-shadow:none!important;break-inside:auto}
+ .ped-kpis>div{break-inside:avoid}
+ .ped-report-section h2,.ped-report-section h3{break-after:avoid}
+ .ped-report-section .table-wrap{overflow:visible!important}
+ .ped-report-section table{width:100%;font-size:10px;border-collapse:collapse}
+ .ped-report-section tr{break-inside:avoid}
+ .ped-report-section thead{display:table-header-group}
+ .ped-item{break-inside:auto}
+ .ped-choice{break-inside:avoid}
+ .ped-bar,.ped-kpis{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
