@@ -80,7 +80,7 @@ function err(e){console.error(e);toast(e?.message||String(e),5500)}
 function check(result){if(result.error)throw result.error;return result.data}
 function stopUpdates(){clearInterval(refreshTimer);clearInterval(studentTimer);clearInterval(heartbeatTimer);refreshTimer=studentTimer=heartbeatTimer=null;if(realtime&&supa){supa.removeChannel(realtime);realtime=null}}
 function setView(view){stopUpdates();state.view=view;if(!['student-join','student-exam'].includes(view)&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});$('#home-btn').classList.toggle('hidden',view==='student-join');$('#logout-btn').classList.toggle('hidden',!(state.teacher&&!isDemo&&['teacher-list','editor','dashboard','pedagogy'].includes(view)));}
-function viewHome(){studentEntrance();}
+function viewHome(){if(isExamInProgress()){if(!confirm('¿Salir de la evaluación? Se registrará una incidencia de salida. Podrás volver a ingresar con tus datos si la prueba sigue abierta.'))return;void studentEvent('pagehide')}studentEntrance();}
 
 // La portada pública conduce exclusivamente al ingreso de estudiantes.
 
@@ -143,9 +143,24 @@ async function studentFetch(examId,token){if(isDemo){const d=db(),s=d.students.f
 async function studentSave(qid,response){if(isDemo){const d=db(),s=d.students.find(s=>s.exam_id===state.activeStudent.exam_id&&s.token===state.activeStudent.token),ex=d.exams.find(e=>e.id===s.exam_id);if(s.submitted_at||ex.status!=='published'||Date.now()>new Date(s.joined_at).getTime()+ex.duration_minutes*60000)throw Error('Tiempo concluido o prueba cerrada');let a=d.answers.find(a=>a.participant_id===s.id&&a.question_id===qid);if(a){a.response=response;a.saved_at=iso()}else d.answers.push({participant_id:s.id,question_id:qid,response,saved_at:iso()});s.last_seen_at=iso();putDb(d);return true}return check(await supa.rpc('qx_student_save',{p_exam:state.activeStudent.exam_id,p_token:state.activeStudent.token,p_question:qid,p_response:response}));}
 async function studentEvent(kind){if(!state.activeStudent||state.view!=='student-exam'||studentLoad?.participant.submitted_at)return;
  if(isDemo){const d=db(),s=d.students.find(s=>s.exam_id===state.activeStudent.exam_id&&s.token===state.activeStudent.token);if(s){d.events.push({id:Date.now()+Math.random(),participant_id:s.id,kind,occurred_at:iso()});s.last_seen_at=iso();putDb(d)}return}
- try{await supa.rpc('qx_student_event',{p_exam:state.activeStudent.exam_id,p_token:state.activeStudent.token,p_kind:kind})}catch(e){console.warn('Evento no enviado',e)}
+ const session=state.activeStudent;try{const r=await supa.rpc('qx_student_event',{p_exam:session.exam_id,p_token:session.token,p_kind:kind});if(r.error){if(isRevokedSession(r.error))invalidateStudentSession(session);else console.warn('Evento no enviado',r.error)}}catch(e){console.warn('Evento no enviado',e)}
 }
-async function studentPing(){if(!state.activeStudent||state.view!=='student-exam'||studentLoad?.participant.submitted_at)return;if(isDemo){const d=db(),s=d.students.find(s=>s.exam_id===state.activeStudent.exam_id&&s.token===state.activeStudent.token);if(s){s.last_seen_at=iso();putDb(d)}return}await supa.rpc('qx_student_ping',{p_exam:state.activeStudent.exam_id,p_token:state.activeStudent.token})}
+function invalidateStudentSession(session){
+ if(!session||state.activeStudent?.token!==session.token||state.view!=='student-exam')return;
+ try{localStorage.removeItem('qx_session_'+session.code);const pos=studentPositionKey();if(pos)localStorage.removeItem(pos)}catch(e){}
+ for(const timer of pendingTimers.values())clearTimeout(timer);
+ pendingTimers.clear();inFlight.clear();state.activeStudent=null;studentLoad=null;studentAnswers=new Map();studentBusy=false;
+ setView('student-removed');
+ app.innerHTML='<div class="narrow card"><h1>Sesión finalizada por el docente</h1><p>Este registro ya no está disponible. Si tu profesor lo autoriza y la evaluación sigue abierta, vuelve a ingresar con tus datos correctos.</p><button class="btn btn-outline" data-action="home">Volver al ingreso</button></div>';
+}
+function isRevokedSession(error){return /sesi[oó]n (?:no reconocida|no encontrada|inv[aá]lida)/i.test(error?.message||'')}
+async function studentPing(){
+ if(!state.activeStudent||state.view!=='student-exam'||studentLoad?.participant.submitted_at)return;
+ const session=state.activeStudent;
+ if(isDemo){const d=db(),st=d.students.find(x=>x.exam_id===session.exam_id&&x.token===session.token);if(!st){invalidateStudentSession(session);return}st.last_seen_at=iso();putDb(d);return}
+ const r=await supa.rpc('qx_student_ping',{p_exam:session.exam_id,p_token:session.token});
+ if(r.error){if(isRevokedSession(r.error)){invalidateStudentSession(session);return}throw r.error}
+}
 async function studentSubmit(){if(isDemo){const d=db(),s=d.students.find(s=>s.exam_id===state.activeStudent.exam_id&&s.token===state.activeStudent.token);s.submitted_at=s.submitted_at||iso();putDb(d);return true}return check(await supa.rpc('qx_student_submit',{p_exam:state.activeStudent.exam_id,p_token:state.activeStudent.token}));}
 
 
@@ -824,6 +839,7 @@ async function studentBegin(codeText,name,curso,numeroLista,email){
   (!saved.curso||saved.curso.toLocaleLowerCase('es-CL')===course.toLocaleLowerCase('es-CL'))&&
   (saved.numero_lista==null||Number(saved.numero_lista)===listNo)&&saved?.email?.toLowerCase()===mail;
  const joined=await studentJoin(c,n,course,listNo,mail,matches?saved.token:null);
+ for(const timer of pendingTimers.values())clearTimeout(timer);pendingTimers.clear();inFlight.clear();studentBusy=false;
  state.activeStudent={exam_id:joined.exam_id,token:joined.token,code:c,name:joined.name,curso:joined.curso||course,numero_lista:joined.numero_lista??listNo,email:joined.email||mail};
  localStorage.setItem('qx_session_'+c,JSON.stringify(state.activeStudent));
  studentLoad=await studentFetch(joined.exam_id,joined.token);
@@ -898,7 +914,7 @@ async function submitWhenTimeEnds() {
 function tickTimer(){if(state.view!=='student-exam')return;const rem=studentRemaining(),t=$('#timer');if(!t)return;const h=Math.floor(rem/3600),m=Math.floor(rem%3600/60),s=rem%60;t.innerHTML=`${h?`${String(h).padStart(2,'0')}:`:''}${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}<small>Tiempo restante</small>`;t.classList.toggle('low',rem<=300);if(rem===0){clearInterval(studentTimer);document.querySelectorAll('[data-student-q]').forEach(n=>n.disabled=true);if(!studentBusy)void submitWhenTimeEnds()}}
 function progress(){const n=studentLoad.questions.filter(q=>studentAnswers.has(q.id)&&valueAnswered(studentAnswers.get(q.id),q.kind)).length;$('#progress-label').textContent=`${n} de ${studentLoad.questions.length} respondidas`;$('#progress-fill').style.width=`${studentLoad.questions.length?n/studentLoad.questions.length*100:0}%`}
 function queueAnswer(questionId,value){studentAnswers.set(questionId,value);progress();if($('#save-state'))$('#save-state').textContent='Guardando…';clearTimeout(pendingTimers.get(questionId));pendingTimers.set(questionId,setTimeout(()=>{pendingTimers.delete(questionId);persistAnswer(questionId,value).catch(err)},550))}
-function persistAnswer(qid,value){const previous=inFlight.get(qid)||Promise.resolve();const next=previous.catch(()=>{}).then(()=>studentSave(qid,value)).then(()=>{if($('#save-state')&&state.view==='student-exam')$('#save-state').textContent='Respuestas guardadas';}).catch(ex=>{if($('#save-state'))$('#save-state').textContent='Error al guardar: compruebe su conexión';throw ex});inFlight.set(qid,next);return next}
+function persistAnswer(qid,value){const session=state.activeStudent;const previous=inFlight.get(qid)||Promise.resolve();const next=previous.catch(()=>{}).then(()=>{if(!session||state.activeStudent?.token!==session.token)throw Error('La sesión anterior ya no está activa.');return studentSave(qid,value)}).then(()=>{if($('#save-state')&&state.view==='student-exam'&&state.activeStudent?.token===session?.token)$('#save-state').textContent='Respuestas guardadas';}).catch(ex=>{if(isRevokedSession(ex))invalidateStudentSession(session);if($('#save-state')&&state.activeStudent?.token===session?.token)$('#save-state').textContent='Error al guardar: compruebe su conexión';throw ex});inFlight.set(qid,next);return next}
 async function flushAnswers(){for(const [qid,t] of pendingTimers){clearTimeout(t);pendingTimers.delete(qid);await persistAnswer(qid,studentAnswers.get(qid))}await Promise.all([...inFlight.values()]);}
 function unansweredStudentQuestions(){
  if(!studentLoad?.questions)return [];
@@ -1031,7 +1047,7 @@ window.addEventListener('blur',()=>studentEvent('blur'));
 window.addEventListener('focus',()=>studentEvent('focus'));
 window.addEventListener('offline',()=>studentEvent('offline'));
 window.addEventListener('online',()=>studentEvent('online'));
-window.addEventListener('pagehide',()=>{if(state.view!=='student-exam'||!state.activeStudent)return;
+window.addEventListener('pagehide',()=>{if(!isExamInProgress())return;
  if(isDemo){const d=db(),s=d.students.find(s=>s.exam_id===state.activeStudent.exam_id&&s.token===state.activeStudent.token);if(s){d.events.push({id:Date.now(),participant_id:s.id,kind:'pagehide',occurred_at:iso()});putDb(d)}return}
  // keepalive intenta entregar el evento incluso al navegar. No ofrece garantía de recepción.
  const endpoint=cfg.supabaseUrl.replace(/\/$/,'')+'/rest/v1/rpc/qx_student_event';const key=cfg.publishableKey;
