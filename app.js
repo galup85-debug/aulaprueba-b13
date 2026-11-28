@@ -755,10 +755,10 @@ function pedManualHTML(student){
  }).join('')+'</section>';
 }
 function pedReportHTML(r,scope){
- const d=r.distribution;
+ const d=r.distribution,e=exigenciaOf(state.exam),grade=currentPedIndividual&&!r.pending?gradeOf(r.earned,r.max,e):null;
  return '<div id="ped-print-report"><section class="ped-report-section"><div class="eyebrow">Informe pedagógico · AulaPrueba B-13</div><h1>'+pedText(state.exam.title)+'</h1><p><b>'+pedText(scope)+'</b> · '+esc(new Date().toLocaleDateString('es-CL'))+'</p><div class="ped-kpis"><div><span>Logro sobre puntos corregidos</span><strong>'+percentage(r.pct)+'</strong></div><div><span>Entregas / inscritos</span><strong>'+r.submitted+' / '+r.enrolled+'</strong></div><div><span>Puntos corregidos</span><strong>'+num(r.earned)+' / '+num(r.max)+'</strong></div><div><span>Preguntas categorizadas</span><strong>'+r.classified+' / '+r.questionCount+'</strong></div></div>'+
  (r.pending?'<p class="notice warning">Informe provisional: '+r.pending+' respuestas o pautas pendientes de corrección. No se incluyen en el denominador corregido ni en la clasificación individual definitiva.</p>':'')+
- '<p class="hint">Se incluyen únicamente entregas confirmadas. Las respuestas omitidas en ítems cerrados se puntúan con cero. Cada dimensión se calcula por separado; no se suman porcentajes entre dimensiones.</p><h3>Niveles de logro (evaluaciones completas y corregidas)</h3><div class="ped-kpis"><div>Logrado ≥ '+r.high+' % <strong>'+d.high+'</strong></div><div>En desarrollo ≥ '+r.low+' % y &lt; '+r.high+' % <strong>'+d.middle+'</strong></div><div>Por reforzar &lt; '+r.low+' % <strong>'+d.low+'</strong></div><div>Sin clasificación definitiva <strong>'+d.excluded+'</strong></div></div></section>'+pedDimensionsHTML(r)+pedFeedbackHTML(r)+ (currentPedIndividual?supervisionHTML(currentPedIndividual,state.snapshot):pedLessonHTML(r))+pedItemsHTML(r)+pedSpecsHTML()+'</div>';
+ '<p class="hint">Se incluyen únicamente entregas confirmadas. Las respuestas omitidas en ítems cerrados se puntúan con cero. Cada dimensión se calcula por separado; no se suman porcentajes entre dimensiones.</p><p><b>Exigencia: '+e+' %'+(currentPedIndividual?' · Nota: '+gradeLabel(grade):'')+'</b></p>'+(currentPedIndividual?'<h3>Retroalimentación cualitativa individual</h3><p>'+esc(r.pending?'Pendiente de corrección definitiva.':qualitativeFeedback(r.earned,r.max,e))+'</p>':'')+'<h3>Niveles de logro (evaluaciones completas y corregidas)</h3><div class="ped-kpis"><div>Logrado ≥ '+r.high+' % <strong>'+d.high+'</strong></div><div>En desarrollo ≥ '+r.low+' % y &lt; '+r.high+' % <strong>'+d.middle+'</strong></div><div>Por reforzar &lt; '+r.low+' % <strong>'+d.low+'</strong></div><div>Sin clasificación definitiva <strong>'+d.excluded+'</strong></div></div></section>'+pedDimensionsHTML(r)+pedFeedbackHTML(r)+ (currentPedIndividual?supervisionHTML(currentPedIndividual,state.snapshot):pedLessonHTML(r))+pedItemsHTML(r)+pedSpecsHTML()+'</div>';
 }
 function renderPedagogy(){
  if(state.view!=='pedagogy')return;
@@ -772,7 +772,7 @@ function renderPedagogy(){
  const scope=individual?'Informe individual · '+individual.name+' · '+(individual.curso||'Sin curso'):pedagogicalFilter?'Informe del curso · '+pedagogicalFilter:'Informe general · todos los cursos inscritos';
  app.innerHTML='<div class="subhead ped-no-print"><div><div class="eyebrow">Área docente · Análisis pedagógico</div><h1>Resultados y retroalimentación</h1></div><button class="btn btn-outline" data-action="ped-back">← Supervisión</button></div>'+
  (!pedagogy.ready?'<p class="notice warning">La migración v5 aún no está activa. Se puede analizar la corrección automática existente, pero no guardar categorías ni corregir respuestas abiertas.</p>':'')+
- '<div class="card ped-controls ped-no-print"><div class="ped-category-grid"><div class="field"><label>Curso</label><select id="ped-course"><option value="">Todos los cursos</option>'+courses.map(c=>'<option value="'+esc(c)+'" '+(c===pedagogicalFilter?'selected':'')+'>'+esc(c)+'</option>').join('')+'</select></div><div class="field"><label>Estudiante</label><select id="ped-student"><option value="">Curso completo</option>'+pool.filter(st=>st.submitted_at).map(st=>'<option value="'+esc(st.id)+'" '+(st.id===pedagogicalStudent?'selected':'')+'>'+esc(st.name)+' · '+esc(st.numero_lista??'')+'</option>').join('')+'</select></div><div class="field"><label>Umbral inferior (%)</label><input id="ped-low" type="number" min="0" max="100" value="'+pedagogicalLow+'"></div><div class="field"><label>Umbral superior (%)</label><input id="ped-high" type="number" min="0" max="100" value="'+pedagogicalHigh+'"></div><div class="field"><label>Clase de retroalimentación (min)</label><input id="ped-minutes" type="number" min="10" max="180" value="'+pedagogicalLessonMinutes+'"></div></div><div class="btn-row"><button class="btn btn-green small" data-action="ped-apply-filters">Aplicar filtros</button><button class="btn btn-outline small" data-action="ped-refresh">Actualizar resultados</button><button class="btn btn-outline small" data-action="ped-print">Imprimir / guardar PDF</button><button class="btn btn-outline small" data-action="ped-csv">Exportar CSV pedagógico</button>'+(individual?'<button class="btn btn-outline small" data-action="ped-email" '+(!individual.email?'disabled':'')+'>Preparar correo de retroalimentación</button>':'')+'</div></div>'+
+ '<div class="card ped-controls ped-no-print"><div class="ped-category-grid"><div class="field"><label>Curso</label><select id="ped-course"><option value="">Todos los cursos</option>'+courses.map(c=>'<option value="'+esc(c)+'" '+(c===pedagogicalFilter?'selected':'')+'>'+esc(c)+'</option>').join('')+'</select></div><div class="field"><label>Estudiante</label><select id="ped-student"><option value="">Curso completo</option>'+pool.filter(st=>st.submitted_at).map(st=>'<option value="'+esc(st.id)+'" '+(st.id===pedagogicalStudent?'selected':'')+'>'+esc(st.name)+' · '+esc(st.numero_lista??'')+'</option>').join('')+'</select></div><div class="field"><label>Umbral inferior (%)</label><input id="ped-low" type="number" min="0" max="100" value="'+pedagogicalLow+'"></div><div class="field"><label>Umbral superior (%)</label><input id="ped-high" type="number" min="0" max="100" value="'+pedagogicalHigh+'"></div><div class="field"><label>Clase de retroalimentación (min)</label><input id="ped-minutes" type="number" min="10" max="180" value="'+pedagogicalLessonMinutes+'"></div></div><div class="btn-row"><button class="btn btn-green small" data-action="ped-apply-filters">Aplicar filtros</button><button class="btn btn-outline small" data-action="ped-refresh">Actualizar resultados</button><button class="btn btn-outline small" data-action="ped-print">Descargar informe PDF (2 páginas)</button><button class="btn btn-outline small" data-action="ped-csv">Exportar CSV pedagógico</button>'+(individual?'<button class="btn btn-outline small" data-action="ped-email" '+(!individual.email?'disabled':'')+'>Preparar correo de retroalimentación</button>':'')+'</div></div>'+
  pedManualHTML(individual)+pedReportHTML(report,scope)+
  (!individual&&report.individual.length?'<section class="card ped-no-print"><h2>Resultados individuales</h2><div class="table-wrap"><table><thead><tr><th>Estudiante</th><th>Curso</th><th>Logro corregido</th><th>Pendientes</th><th></th></tr></thead><tbody>'+report.individual.map(i=>'<tr><td>'+pedText(i.student.name)+'</td><td>'+pedText(i.student.curso||'—')+'</td><td>'+percentage(i.pct)+'</td><td>'+i.pending+'</td><td><button class="btn btn-outline small" data-action="ped-individual" data-id="'+esc(i.student.id)+'">Ver informe</button></td></tr>').join('')+'</tbody></table></div></section>':'');
 }
@@ -794,24 +794,89 @@ async function pedSaveGrade(stid,qid){
 }
 function pedCSV(){
  const r=currentPedReport;if(!r)return;
- const rows=[['Tipo','Estudiante / dimensión','Categoría / pregunta','Puntos obtenidos','Puntos máximos corregidos','Logro %','Pendientes','Detalle','Pestaña no visible','Pérdida de foco','Salida/navegación','Salida pantalla completa','Recarga','Estado de supervisión']];
- for(const i of r.individual){const x=supervisionReport(i.student,state.snapshot);rows.push(['Individual',i.student.name,i.student.curso||'',i.earned,i.max,i.pct??'',i.pending,'',x.hidden,x.blur,x.pagehide,x.fullscreen,x.reload,x.status]);}
+ const rows=[['Tipo','Estudiante / dimensión','Categoría / pregunta','Puntos obtenidos','Puntos máximos corregidos','Logro %','Pendientes','Detalle','Pestaña no visible','Pérdida de foco','Salida/navegación','Salida pantalla completa','Recarga','Estado de supervisión','Exigencia %','Nota']];
+ for(const i of r.individual){const x=supervisionReport(i.student,state.snapshot);rows.push(['Individual',i.student.name,i.student.curso||'',i.earned,i.max,i.pct??'',i.pending,'',x.hidden,x.blur,x.pagehide,x.fullscreen,x.reload,x.status,exigenciaOf(state.exam),i.pending?'':gradeOf(i.earned,i.max,exigenciaOf(state.exam))??'']);}
  for(const d of r.dimensions)for(const g of d.groups)rows.push(['Dimensión',d.name,g.name,g.earned,g.max,g.pct??'','',g.questions.join(', ')]);
  for(const it of r.items)rows.push(['Pregunta','',it.number,it.earned,it.max,it.pct??'',it.pending,it.q.prompt]);
  downloadCsv('analisis_'+state.exam.code+'.csv',rows);
 }
-function pedPrint(){
- const root=$('#ped-print-report');if(!root)return;
- const expanded=[...root.querySelectorAll('details')].filter(x=>!x.open);expanded.forEach(x=>x.open=true);
- window.print();expanded.forEach(x=>x.open=false);
+
+async function pedPrint(){
+ const r=currentPedReport,st=currentPedIndividual,exam={...state.exam},snap=state.snapshot,course=pedagogicalFilter;
+ if(!r)return;
+ const {jsPDF}=await import('https://cdn.jsdelivr.net/npm/jspdf@2.5.2/+esm');
+ const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+ const e=exigenciaOf(exam),f=feedback(r);
+ const complete=r.individual.filter(i=>!i.pending&&i.max>0);
+ const grades=complete.map(i=>gradeOf(i.earned,i.max,e));
+ const clip=(v,n=140)=>{const t=String(v??'').replace(/\s+/g,' ').trim();return t.length>n?t.slice(0,n-3)+'...':t};
+ let y=0;
+ function line(value,size=10,maxLines=3,bold=false,color=[35,55,65]){
+  doc.setFont('helvetica',bold?'bold':'normal');doc.setFontSize(size);doc.setTextColor(...color);
+  let lines=doc.splitTextToSize(clip(value,900),180);
+  if(lines.length>maxLines){lines=lines.slice(0,maxLines);lines[lines.length-1]=clip(lines[lines.length-1],Math.max(4,lines[lines.length-1].length-4))+'...'}
+  if(y+lines.length*5>276)return;
+  doc.text(lines,15,y);y+=lines.length*5+2;
+ }
+ function section(title){y+=3;line(title,12,1,true,[18,78,103]);doc.setDrawColor(207,223,229);doc.line(15,y-1,195,y-1);y+=2}
+ function header(page){
+  doc.setFillColor(18,59,74);doc.rect(0,0,210,3,'F');
+  y=13;line('LICEO BICENTENARIO INDUSTRIAL RAMÓN BARROS LUCO',10,2,true,[18,78,103]);
+  line('AulaPrueba B-13 | Creado por Ricardo Galup',8,1);
+  line(st?'INFORME INDIVIDUAL':'INFORME GENERAL DEL CURSO',15,1,true);
+  line(exam.title,12,2,true);
+  line(st?st.name+' | '+(st.curso||'Sin curso')+' | Lista '+(st.numero_lista??'—'):(course||'Todos los cursos inscritos'),10,2);
+  line('Fecha: '+new Date().toLocaleDateString('es-CL')+' | Exigencia: '+e+' %',9,1);
+  doc.setFontSize(8);doc.setTextColor(90,105,110);doc.text('AulaPrueba B-13   |   Página '+page+' de 2',15,287);
+ }
+ header(1);
+ section('Resultado y calificación');
+ line('Puntaje '+(st?'':'acumulado del grupo: ')+num(r.earned)+' / '+num(r.max)+' puntos corregidos  |  Logro: '+percentage(r.pct),12,2,true);
+ if(st)line('Nota: '+(r.pending?'Pendiente de corrección':gradeLabel(gradeOf(r.earned,r.max,e))),14,1,true);
+ else {line('Entregas: '+r.submitted+' / '+r.enrolled+' | Nota promedio (correcciones completas): '+(grades.length?gradeLabel(grades.reduce((a,b)=>a+b,0)/grades.length):'Pendiente'),10,2);line('Notas definitivas: '+grades.length+' | Notas >= 4,0: '+grades.filter(n=>n>=4).length+' | Notas < 4,0: '+grades.filter(n=>n<4).length,10,2)}
+ if(r.pending)line('Informe provisional: '+r.pending+' respuestas o pautas pendientes. No se asigna nota definitiva a correcciones incompletas.',9,2);
+ section(st?'Retroalimentación individual':'Retroalimentación general');
+ line(st?(r.pending?'La corrección está pendiente. La valoración definitiva se comunicará al completar la revisión.':qualitativeFeedback(r.earned,r.max,e)):f.summary,11,5);
+ if(!st){line(f.recommendation,10,5)}
+ section('Dimensiones: síntesis de resultados');
+ const groups=r.dimensions.flatMap(d=>d.groups.filter(g=>g.pct!==null).map(g=>({...g,dimension:d.name})));
+ const sorted=[...groups].sort((a,b)=>b.pct-a.pct);
+ const highlights=[...sorted.slice(0,3),...sorted.slice(-3).filter(g=>!sorted.slice(0,3).includes(g))];
+ if(!highlights.length)line('Sin categorías evaluadas con puntaje calculable.',10,2);
+ else for(const g of highlights)line(clip(g.dimension,30)+' / '+clip(g.name,75)+' | '+percentage(g.pct)+' | '+g.questions.length+' ítem(s)',9,2);
+ if(groups.length>highlights.length)line('Se muestra una síntesis de las categorías extremas; detalle completo en el panel docente y CSV.',8,2);
+ doc.addPage();header(2);
+ if(st){
+  const x=supervisionReport(st,snap);
+  section('Supervisión individual');
+  line(x.status,11,2,true);
+  line('Pestaña no visible: '+x.hidden+' | Pérdida de foco: '+x.blur+' | Salida/navegación: '+x.pagehide,10,2);
+  line('Pantalla completa: '+x.fullscreen+' | Recargas: '+x.reload,10,2);
+  for(const ev of x.events.slice(0,6))line(fmt(ev.occurred_at)+' | '+x.labels[ev.kind],9,2);
+  if(x.events.length>6)line('Se muestran 6 de '+x.events.length+' eventos. Cronología completa en el panel docente.',9,2);
+  line('No se contabiliza la demora. Los eventos pueden coincidir y no constituyen prueba de fraude.',9,3);
+  section('Orientaciones para el aprendizaje');
+  line('Refuerza los contenidos trabajados con ejercicios nuevos, fundamenta las respuestas y revisa tus procedimientos con el docente.',10,4);
+  line('La pauta y el detalle de aciertos y errores no se incluyen en este informe resumido.',9,2);
+ }else{
+  section('Fortalezas y aprendizajes por reforzar');
+  for(const g of f.strengths.slice(0,3))line('Fortaleza: '+clip(g.dimension,30)+' / '+clip(g.name,80)+' ('+percentage(g.pct)+')',10,2);
+  for(const g of f.needs.slice(0,3))line('Reforzar: '+clip(g.dimension,30)+' / '+clip(g.name,80)+' ('+percentage(g.pct)+')',10,2);
+  if(!f.strengths.length&&!f.needs.length)line('Sin categorías en los umbrales de fortaleza o reforzamiento.',10,2);
+  section('Plan de retroalimentación');
+  line('Preguntas prioritarias: '+(f.priority.map(i=>i.number).join(', ')||'Sin ítems bajo el umbral inferior.'),10,2);
+  line('Presentar resultados, analizar dificultades, modelar estrategias, aplicar nuevas tareas y verificar aprendizajes. Duración sugerida: '+pedagogicalLessonMinutes+' minutos.',10,4);
+ }
+ line('Informe sintético (máximo 2 páginas A4). Los resultados detallados y las especificaciones permanecen disponibles en el panel docente.',8,3);
+ doc.save('Informe_'+exam.code+'_'+(st?String(st.numero_lista??'individual'):'curso')+'.pdf');
 }
 function pedEmail(){
  const st=currentPedIndividual,r=currentPedReport;if(!st||!st.email||!r)throw Error('Selecciona un estudiante con correo.');
  if(state.exam.status!=='closed'&&!confirm('La evaluación todavía está abierta. ¿Preparar el informe sin incluir la pauta ni las respuestas correctas?'))return;
  if(r.pending&&!confirm('El informe contiene correcciones pendientes. ¿Preparar igualmente un correo provisional?'))return;
  if(!confirm('Comprueba que '+st.email+' pertenece a '+st.name+'. ¿Preparar el correo para revisarlo antes de enviarlo?'))return;
- const f=feedback(r);
- const body=['AulaPrueba B-13 — '+state.exam.title,'Estudiante: '+st.name,f.summary,...r.dimensions.flatMap(d=>[d.name+':',...d.groups.map(g=>g.name+': '+percentage(g.pct))]),'Fortalezas: '+(f.strengths.map(g=>g.name+' ('+percentage(g.pct)+')').join('; ')||'Sin categorías identificadas'),'Por reforzar: '+(f.needs.map(g=>g.name+' ('+percentage(g.pct)+')').join('; ')||'Sin categorías identificadas'),f.recommendation,supervisionText(st,state.snapshot)].join('\n');
+ const e=exigenciaOf(state.exam);
+ const body=['AulaPrueba B-13 — '+state.exam.title,'Estudiante: '+st.name,'Puntaje: '+num(r.earned)+' / '+num(r.max)+(r.pending?' (corrección provisional)':''),'Exigencia: '+e+' %','Nota: '+(r.pending?'Pendiente':gradeLabel(gradeOf(r.earned,r.max,e))),r.pending?'La retroalimentación definitiva está pendiente.':qualitativeFeedback(r.earned,r.max,e)].join('\n');
  window.location.href='mailto:'+encodeURIComponent(st.email)+'?subject='+encodeURIComponent('Retroalimentación — '+state.exam.title)+'&body='+encodeURIComponent(body);
 }
 
@@ -1041,7 +1106,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
  if(a==='ped-individual'){pedagogicalStudent=b.dataset.id;renderPedagogy();return}
  if(a==='ped-grade'){b.disabled=true;await pedSaveGrade(b.dataset.stid,b.dataset.qid);return}
  if(a==='ped-csv'){pedCSV();return}
- if(a==='ped-print'){pedPrint();return}
+ if(a==='ped-print'){await pedPrint();return}
  if(a==='ped-email'){pedEmail();return}
  if(a==='close-exam'){if(!confirm('¿Cerrar la prueba? Los estudiantes ya no podrán modificar respuestas.'))return;state.exam=await teacherUpdate(state.exam,{status:'closed'});renderDashboard();toast('Prueba cerrada');return}
  if(a==='inspect'){state.selectedStudent=b.dataset.id;renderDashboard(true);return}if(a==='close-inspect'){state.selectedStudent=null;renderDashboard(true);return}
