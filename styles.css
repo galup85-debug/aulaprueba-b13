@@ -260,3 +260,27 @@ body{min-width:280px}
 
 /* v5.7 · Resultado individual al entregar */
 #immediate-result{margin-top:22px;text-align:left}.result-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.result-kpis>div{border:1px solid #d8e6eb;background:#f7fafb;padding:15px;border-radius:12px;text-align:center}.result-kpis span{display:block;font-size:13px;color:#506875}.result-kpis strong{display:block;font-size:clamp(25px,6vw,35px);color:#123b4a;margin-top:6px}.result-feedback{margin-top:16px;padding:15px 16px;border:1px solid #d8e6eb;border-radius:12px;background:#fff}.result-feedback h2{font-size:17px;color:#123b4a;margin:0 0 9px}.result-feedback p{line-height:1.55;margin:0;font-size:14px}
+
+/* v5.8 · Aleatorización y editor matemático */
+.shuffle-settings{background:#f6fafb;border:1px solid #dce8ec;border-radius:12px;padding:12px 15px;margin:12px 0 18px}
+.shuffle-settings h3{margin:0 0 10px;font-size:15px;color:#123b4a}
+.shuffle-settings .ocr-option,.math-editor .ocr-option{margin:10px 0}
+.math-editor{background:#f8fbfc;border:1px solid #dce8ec;border-radius:12px;padding:12px;margin:14px 0}
+.math-editor-heading{display:grid;gap:4px;color:#123b4a;margin-bottom:10px}
+.math-targets{margin:8px 0 10px}
+.math-targets label{display:flex;align-items:center;gap:8px;font-size:13px}
+.math-targets select{width:auto;max-width:100%;padding:7px 9px}
+.math-toolbar{display:flex;flex-wrap:wrap;gap:6px}
+.math-toolbar .btn{min-height:34px;min-width:35px;padding:6px 10px;font-size:13px}
+.math-preview{border-top:1px solid #dce8ec;margin-top:12px;padding-top:12px;line-height:1.55}
+.math-preview-label{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:#4a6574;font-weight:700;margin:0 0 7px}
+.math-preview-prompt{font-weight:650;margin-bottom:9px;white-space:pre-wrap;overflow-wrap:anywhere}
+.math-preview-option{padding:8px 10px;background:#fff;border:1px solid #e0eaed;border-radius:8px;margin:5px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.math-source{font-family:inherit;overflow-wrap:anywhere}
+.math-source .katex{font-size:1.05em;white-space:normal}
+.math-block{display:block;overflow-x:auto;max-width:100%;padding:3px 0}
+.math-block .katex-display{margin:.45em 0}
+.math-invalid{color:#a33535;text-decoration:underline dotted}
+.question-title .math-block,.option .math-block{font-size:.95em}
+.question-card .option span{min-width:0;overflow-wrap:anywhere}
+@media(max-width:760px){.math-toolbar .btn{min-height:42px;min-width:42px}.math-editor{padding:10px}.math-targets label{flex-wrap:wrap}}
