@@ -303,3 +303,14 @@ body{min-width:280px}
 .question-mode select{width:156px;min-width:156px;max-width:none;white-space:nowrap;overflow-wrap:normal;word-break:normal;font-size:12px;padding:6px 28px 6px 12px}
 .question-mode select option{white-space:nowrap;overflow-wrap:normal;word-break:normal;font-size:13px}
 @media(max-width:480px){.question-mode select{width:150px;min-width:150px;font-size:12px;padding-left:10px}}
+
+/* v5.9.2 · Listados docentes: interlineado sencillo y filas compactas. */
+.student-list-compact table{font-size:12px;line-height:1.15;border-collapse:collapse;border-spacing:0}
+.student-list-compact th,.student-list-compact td{padding:3px 8px;vertical-align:middle;line-height:1.15;white-space:nowrap}
+.student-list-compact th{padding-block:6px}
+.student-list-compact td .mini,.student-list-compact td .muted{font-size:11px;line-height:1.1;margin:0;padding:0}
+.student-list-compact td .btn-row{gap:4px;flex-wrap:nowrap;align-items:center}
+.student-list-compact td .btn.small{font-size:11px;line-height:1.1;padding:3px 7px;min-height:24px;border-radius:6px;white-space:nowrap}
+.student-list-compact .badge-alert{font-size:10px;line-height:1.1;padding:2px 4px;white-space:nowrap}
+.student-list-compact td.empty{padding:12px}
+@media(max-width:760px){.student-list-compact td .btn.small{min-height:28px}.student-list-compact th,.student-list-compact td{padding-inline:6px}}
