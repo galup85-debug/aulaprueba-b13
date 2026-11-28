@@ -1001,6 +1001,30 @@ function pedEmail(){
 }
 
 /* ============================= ESTUDIANTE ============================= */
+const SCHOOL_LEVELS={'1':'1ero','2':'2do','3':'3ero','4':'4to'};
+function courseLetters(level){return ['1','2'].includes(String(level))?'ABCDEF':['3','4'].includes(String(level))?'ABCDEFG':''}
+function parseSchoolCourse(course){
+ const t=String(course??'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+ const m=t.match(/^([1-4])\s*(?:[.º°ª]|ERO|RO|DO|TO|ER|O|A|\s)*\s*(?:MEDIO)?\s*([A-G])$/);
+ if(m&&courseLetters(m[1]).includes(m[2]))return {level:m[1],letter:m[2]};
+ return {level:'',letter:''};
+}
+function schoolCourse(level,letter){return courseLetters(level).includes(letter)&&letter?SCHOOL_LEVELS[level]+' '+letter:''}
+function courseLetterOptions(level,selected=''){return '<option value="">Curso</option>'+[...courseLetters(level)].map(l=>'<option value="'+l+'" '+(l===selected?'selected':'')+'>'+l+'</option>').join('')}
+function courseSelectorHTML(existing){
+ const {level,letter}=parseSchoolCourse(existing?.curso);
+ return '<div class="field"><label id="join-course-label">Curso</label><div class="join-course-pickers" role="group" aria-labelledby="join-course-label"><label class="join-course-pill"><select id="join-level" aria-label="Nivel" required><option value="">Nivel</option>'+Object.entries(SCHOOL_LEVELS).map(([k,v])=>'<option value="'+k+'" '+(level===k?'selected':'')+'>'+v+'</option>').join('')+'</select></label><label class="join-course-pill"><select id="join-letter" aria-label="Letra del curso" required '+(!level?'disabled':'')+'>'+courseLetterOptions(level,letter)+'</select></label></div></div>';
+}
+function chosenSchoolCourse(){
+ const level=$('#join-level')?.value||'',letter=$('#join-letter')?.value||'';
+ return schoolCourse(level,letter);
+}
+function updateSchoolCourse(){
+ const level=$('#join-level')?.value||'',select=$('#join-letter');if(!select)return;
+ const old=select.value;select.innerHTML=courseLetterOptions(level,courseLetters(level).includes(old)?old:'');
+ select.disabled=!level;
+}
+
 function studentEntrance(codeOverride=null){
  setView('student-join');
  const supplied=(codeOverride||new URLSearchParams(location.search).get('code')||'').trim().toUpperCase();
@@ -1010,20 +1034,20 @@ function studentEntrance(codeOverride=null){
   return;
  }
  const existing=safeSession('qx_session_'+supplied);
- app.innerHTML=`<div class="narrow"><section class="hero"><div class="eyebrow">Ingreso del estudiante</div><h1>Identificación para la evaluación</h1><p>Completa únicamente estos cuatro datos. No se requiere teléfono ni contraseña.</p></section><div class="card"><div class="notice"><b>Código de la evaluación</b> <span class="code">${esc(supplied)}</span></div><form id="student-join-form"><div class="field"><label for="join-name">Nombre y apellido</label><input id="join-name" minlength="3" maxlength="120" required autocomplete="name" value="${esc(existing?.name||'')}" placeholder="Nombre y apellido" /></div><div class="field"><label for="join-course">Curso</label><input id="join-course" minlength="2" maxlength="45" required autocomplete="off" value="${esc(existing?.curso||'')}" placeholder="Ej.: 2.º medio B" /></div><div class="field"><label for="join-list">Número de lista</label><input id="join-list" type="number" min="1" max="100" step="1" inputmode="numeric" required value="${esc(existing?.numero_lista??'')}" placeholder="Ej.: 13" /></div><div class="field"><label for="join-email">Correo electrónico (preferentemente del liceo)</label><input id="join-email" type="email" maxlength="254" autocomplete="email" required value="${esc(existing?.email||'')}" placeholder="nombre@liceo.cl" /><span class="hint">Utiliza tu correo institucional si tienes uno. Comprueba que esté bien escrito para recibir los resultados.</span></div><div class="notice">Al comenzar, se solicitará pantalla completa. El profesor podrá revisar las respuestas y las incidencias que el navegador consiga registrar. Según la configuración, se restringirán la copia, el pegado y otras acciones, se ocultarán preguntas al perder el foco y se mostrará una marca de agua individual.</div><button class="btn block" type="submit">Iniciar evaluación en pantalla completa</button></form><p class="hint">Una página web no puede bloquear por completo el uso de otras aplicaciones. El correo se registra sin verificación de propiedad.</p></div></div>`;
+ app.innerHTML=`<div class="narrow"><section class="hero"><div class="eyebrow">Ingreso del estudiante</div><h1>Identificación para la evaluación</h1><p>Completa únicamente estos cuatro datos. No se requiere teléfono ni contraseña.</p></section><div class="card"><div class="notice"><b>Código de la evaluación</b> <span class="code">${esc(supplied)}</span></div><form id="student-join-form"><div class="field"><label for="join-name">Nombre y apellido</label><input id="join-name" minlength="3" maxlength="120" required autocomplete="name" value="${esc(existing?.name||'')}" placeholder="Nombre y apellido" /></div>${courseSelectorHTML(existing)}<div class="field"><label for="join-list">Número de lista</label><input id="join-list" type="number" min="1" max="100" step="1" inputmode="numeric" required value="${esc(existing?.numero_lista??'')}" placeholder="Ej.: 13" /></div><div class="field"><label for="join-email">Correo electrónico (preferentemente del liceo)</label><input id="join-email" type="email" maxlength="254" autocomplete="email" required value="${esc(existing?.email||'')}" placeholder="nombre@liceo.cl" /><span class="hint">Utiliza tu correo institucional si tienes uno. Comprueba que esté bien escrito para recibir los resultados.</span></div><div class="notice">Al comenzar, se solicitará pantalla completa. El profesor podrá revisar las respuestas y las incidencias que el navegador consiga registrar. Según la configuración, se restringirán la copia, el pegado y otras acciones, se ocultarán preguntas al perder el foco y se mostrará una marca de agua individual.</div><button class="btn block" type="submit">Iniciar evaluación en pantalla completa</button></form><p class="hint">Una página web no puede bloquear por completo el uso de otras aplicaciones. El correo se registra sin verificación de propiedad.</p></div></div>`;
 }
 async function studentBegin(codeText,name,curso,numeroLista,email){
  const c=codeText.trim().toUpperCase(),n=name.trim().replace(/\s+/g,' '),course=curso.trim().replace(/\s+/g,' '),listNo=Number(numeroLista),mail=email.trim().toLowerCase();
  if(!c)throw Error('Falta el código de evaluación');
  if(!validFullName(n)||n.length>120)throw Error('Escribe nombre y apellido');
- if(!validCourse(course))throw Error('Introduce un curso válido');
+ if(!validCourse(course)||!schoolCourse(parseSchoolCourse(course).level,parseSchoolCourse(course).letter))throw Error('Selecciona un nivel y una letra de curso válidos');
  if(!validListNumber(listNo))throw Error('Introduce un número de lista entre 1 y 100');
  if(!validEmail(mail))throw Error('Escribe un correo electrónico válido');
  const saved=safeSession('qx_session_'+c);
  const matches=saved?.name?.toLocaleLowerCase('es-CL')===n.toLocaleLowerCase('es-CL')&&
-  (!saved.curso||saved.curso.toLocaleLowerCase('es-CL')===course.toLocaleLowerCase('es-CL'))&&
+  (!saved.curso||saved.curso.toLocaleLowerCase('es-CL')===course.toLocaleLowerCase('es-CL')||schoolCourse(parseSchoolCourse(saved.curso).level,parseSchoolCourse(saved.curso).letter)===course)&&
   (saved.numero_lista==null||Number(saved.numero_lista)===listNo)&&saved?.email?.toLowerCase()===mail;
- const joined=await studentJoin(c,n,course,listNo,mail,matches?saved.token:null);
+ const joined=await studentJoin(c,n,matches&&saved?.curso?saved.curso:course,listNo,mail,matches?saved.token:null);
  for(const timer of pendingTimers.values())clearTimeout(timer);pendingTimers.clear();inFlight.clear();studentBusy=false;
  state.activeStudent={exam_id:joined.exam_id,token:joined.token,code:c,name:joined.name,curso:joined.curso||course,numero_lista:joined.numero_lista??listNo,email:joined.email||mail};
  localStorage.setItem('qx_session_'+c,JSON.stringify(state.activeStudent));
@@ -1244,8 +1268,9 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
 app.addEventListener('submit',async e=>{e.preventDefault();const form=e.target;
  if(form.id==='login-form'){const btn=form.querySelector('button[type=submit]');btn.disabled=true;try{const email=$('#email').value.trim().toLowerCase();if(!validEmail(email))throw Error('Escribe un correo electrónico válido');const redirect=new URL(location.pathname,location.origin);redirect.searchParams.set('docente','1');check(await supa.auth.signInWithOtp({email,options:{emailRedirectTo:redirect.toString(),shouldCreateUser:false}}));app.innerHTML='<div class="narrow card"><h2>Revisa tu correo electrónico</h2><p>Te enviamos un enlace para ingresar al panel docente sin contraseña. Si no llega, revisa la carpeta de correo no deseado.</p><button class="btn btn-outline" data-action="home">Volver al inicio</button></div>';toast('Enlace solicitado. Revisa tu correo electrónico.',6000)}catch(ex){err(ex)}finally{btn.disabled=false}}
  if(form.id==='student-code-form'){studentEntrance($('#join-code').value);return}
- if(form.id==='student-join-form'){const btn=form.querySelector('button[type=submit]');btn.disabled=true;try{const fullRequest=askFullscreen();await studentBegin(state.joinCode,$('#join-name').value,$('#join-course').value,$('#join-list').value,$('#join-email').value);const full=await fullRequest;if(!full)toast('El navegador no permitió pantalla completa. Usa el botón para intentarlo de nuevo.');fullscreenBanner()}catch(ex){err(ex);btn.disabled=false;if(document.fullscreenElement&&state.view==='student-join')document.exitFullscreen().catch(()=>{})}}});
+ if(form.id==='student-join-form'){const btn=form.querySelector('button[type=submit]');btn.disabled=true;try{const fullRequest=askFullscreen();await studentBegin(state.joinCode,$('#join-name').value,chosenSchoolCourse(),$('#join-list').value,$('#join-email').value);const full=await fullRequest;if(!full)toast('El navegador no permitió pantalla completa. Usa el botón para intentarlo de nuevo.');fullscreenBanner()}catch(ex){err(ex);btn.disabled=false;if(document.fullscreenElement&&state.view==='student-join')document.exitFullscreen().catch(()=>{})}}});
 app.addEventListener('change',async e=>{
+ if(e.target.id==='join-level'){updateSchoolCourse();return}
  if(e.target.dataset.pdfIndex!==undefined&&pendingPdf?.examId===state.exam?.id){const index=Number(e.target.dataset.pdfIndex);if(e.target.checked)pendingPdf.excluded.delete(index);else pendingPdf.excluded.add(index);const n=$('#pdf-selected-count');if(n)n.textContent=(pendingPdf.parsed.questions.length-pendingPdf.excluded.size)+' de '+pendingPdf.parsed.questions.length+' preguntas seleccionadas.';return}
  if(e.target.dataset.importKind&&e.target.files?.[0]){const input=e.target,file=input.files[0],kind=input.dataset.importKind;input.value='';await importDroppedFile(kind,file);return}
  if(e.target.dataset.field==='editor-mode'){changeEditorMode(e.target.closest('.question-editor'),e.target.value);return}
