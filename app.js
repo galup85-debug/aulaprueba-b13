@@ -33,6 +33,8 @@ const safeSession = key => {try{return JSON.parse(localStorage.getItem(key)||'nu
 let wasFullscreen = false;
 
 let integrityAttempts=0,integrityInterruptedAt=null;
+async function registerResume(){await studentEvent('resume');if(isExamInProgress()){await studentEvent(document.hidden?'hidden':'visible');if(isExamInProgress())await studentEvent(document.hasFocus()?'focus':'blur');}}
+window.addEventListener('pageshow',e=>{if(e.persisted&&isExamInProgress()){void registerResume();updateIntegrityCurtain()}});
 function flagsNow(){return integrityOf(studentLoad?.exam)}
 function updateIntegrityCurtain(){
  if(!isExamInProgress())return;
@@ -201,7 +203,13 @@ async function studentFetch(examId,token){if(isDemo){const d=db(),s=d.students.f
 async function studentSave(qid,response){if(isDemo){const d=db(),s=d.students.find(s=>s.exam_id===state.activeStudent.exam_id&&s.token===state.activeStudent.token),ex=d.exams.find(e=>e.id===s.exam_id);if(s.submitted_at||ex.status!=='published'||Date.now()>new Date(s.joined_at).getTime()+ex.duration_minutes*60000)throw Error('Tiempo concluido o prueba cerrada');let a=d.answers.find(a=>a.participant_id===s.id&&a.question_id===qid);if(a){a.response=response;a.saved_at=iso()}else d.answers.push({participant_id:s.id,question_id:qid,response,saved_at:iso()});s.last_seen_at=iso();putDb(d);return true}return check(await supa.rpc('qx_student_save_v60',{p_exam:state.activeStudent.exam_id,p_token:state.activeStudent.token,p_client:integrityClient,p_question:qid,p_response:response}));}
 async function studentEvent(kind){if(!state.activeStudent||state.view!=='student-exam'||studentLoad?.participant.submitted_at)return;
  if(isDemo){const d=db(),s=d.students.find(s=>s.exam_id===state.activeStudent.exam_id&&s.token===state.activeStudent.token);if(s){d.events.push({id:Date.now()+Math.random(),participant_id:s.id,kind,occurred_at:iso()});s.last_seen_at=iso();putDb(d)}return}
- const session=state.activeStudent;try{const r=await supa.rpc('qx_student_event_v60',{p_exam:session.exam_id,p_token:session.token,p_client:integrityClient,p_kind:kind});if(r.error){if(isRevokedSession(r.error))invalidateStudentSession(session);else console.warn('Evento no enviado',r.error)}}catch(e){console.warn('Evento no enviado',e)}
+ const session=state.activeStudent;try{const r=await supa.rpc('qx_student_event_v60',{p_exam:session.exam_id,p_token:session.token,p_client:integrityClient,p_kind:kind});if(r.error){if(isRevokedSession(r.error))invalidateStudentSession(session);else console.warn('Evento no enviado',r.error)}else if(r.data===false&&isExamInProgress()&&state.activeStudent?.token===session.token&&kind!=='pagehide'){await studentPing().catch(console.error)}}catch(e){console.warn('Evento no enviado',e)}
+}
+function endConflictingSession(session){
+ if(!session||state.activeStudent?.token!==session.token||state.view!=='student-exam')return;
+ for(const timer of pendingTimers.values())clearTimeout(timer);pendingTimers.clear();inFlight.clear();
+ state.activeStudent=null;studentLoad=null;studentAnswers=new Map();studentBusy=false;setView('student-removed');
+ app.innerHTML='<div class="narrow card"><h1>Otra sesión activa</h1><p>Se está usando este intento en otra pestaña o dispositivo. Regresa a la sesión original. No se han borrado las respuestas guardadas.</p><button class="btn btn-outline" data-action="home">Volver al ingreso</button></div>';
 }
 function invalidateStudentSession(session){
  if(!session||state.activeStudent?.token!==session.token||state.view!=='student-exam')return;
@@ -217,7 +225,7 @@ async function studentPing(){
  const session=state.activeStudent;
  if(isDemo){const d=db(),st=d.students.find(x=>x.exam_id===session.exam_id&&x.token===session.token);if(!st){invalidateStudentSession(session);return}st.last_seen_at=iso();putDb(d);return}
  const r=await supa.rpc('qx_student_ping_v60',{p_exam:session.exam_id,p_token:session.token,p_client:integrityClient});
- if(r.error){if(isRevokedSession(r.error)||/Otra sesión activa/i.test(r.error.message||'')){invalidateStudentSession(session);return}throw r.error}
+ if(r.error){if(/Otra sesión activa/i.test(r.error.message||'')){endConflictingSession(session);return}if(isRevokedSession(r.error)){invalidateStudentSession(session);return}throw r.error}
 }
 async function studentSubmit(){if(isDemo){const d=db(),s=d.students.find(s=>s.exam_id===state.activeStudent.exam_id&&s.token===state.activeStudent.token);s.submitted_at=s.submitted_at||iso();putDb(d);return true}return check(await supa.rpc('qx_student_submit_v60',{p_exam:state.activeStudent.exam_id,p_token:state.activeStudent.token,p_client:integrityClient}));}
 
@@ -1021,7 +1029,7 @@ async function studentBegin(codeText,name,curso,numeroLista,email){
  localStorage.setItem('qx_session_'+c,JSON.stringify(state.activeStudent));
  studentLoad=await studentFetch(joined.exam_id,joined.token);integrityAttempts=0;integrityInterruptedAt=null;
  serverClockOffset=Date.now()-new Date(studentLoad.participant.server_now).getTime();
- studentAnswers=new Map(studentLoad.answers.map(a=>[a.question_id,a.response]));deadlineSubmissionAttempted=false;resumeStudentPosition();renderStudent();if(isExamInProgress()){void studentEvent('resume');if(document.hidden)void studentEvent('hidden');if(!document.hasFocus())void studentEvent('blur');}
+ studentAnswers=new Map(studentLoad.answers.map(a=>[a.question_id,a.response]));deadlineSubmissionAttempted=false;resumeStudentPosition();renderStudent();if(isExamInProgress())void registerResume();
 }
 
 /* Navegación de una sola pregunta por pantalla, con posición persistida por sesión. */
@@ -1129,7 +1137,7 @@ async function submitWhenTimeEnds() {
 function tickTimer(){if(state.view!=='student-exam')return;const rem=studentRemaining(),t=$('#timer');if(!t)return;const h=Math.floor(rem/3600),m=Math.floor(rem%3600/60),s=rem%60;t.innerHTML=`${h?`${String(h).padStart(2,'0')}:`:''}${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}<small>Tiempo restante</small>`;t.classList.toggle('low',rem<=300);if(rem===0){clearInterval(studentTimer);document.querySelectorAll('[data-student-q]').forEach(n=>n.disabled=true);if(!studentBusy)void submitWhenTimeEnds()}}
 function progress(){const n=studentLoad.questions.filter(q=>studentAnswers.has(q.id)&&valueAnswered(studentAnswers.get(q.id),q.kind)).length;$('#progress-label').textContent=`${n} de ${studentLoad.questions.length} respondidas`;$('#progress-fill').style.width=`${studentLoad.questions.length?n/studentLoad.questions.length*100:0}%`}
 function queueAnswer(questionId,value){studentAnswers.set(questionId,value);progress();if($('#save-state'))$('#save-state').textContent='Guardando…';clearTimeout(pendingTimers.get(questionId));pendingTimers.set(questionId,setTimeout(()=>{pendingTimers.delete(questionId);persistAnswer(questionId,value).catch(err)},550))}
-function persistAnswer(qid,value){const session=state.activeStudent;const previous=inFlight.get(qid)||Promise.resolve();const next=previous.catch(()=>{}).then(()=>{if(!session||state.activeStudent?.token!==session.token)throw Error('La sesión anterior ya no está activa.');return studentSave(qid,value)}).then(()=>{if($('#save-state')&&state.view==='student-exam'&&state.activeStudent?.token===session?.token)$('#save-state').textContent='Respuestas guardadas';}).catch(ex=>{if(isRevokedSession(ex)||/Otra sesión activa/i.test(ex?.message||''))invalidateStudentSession(session);if($('#save-state')&&state.activeStudent?.token===session?.token)$('#save-state').textContent='Error al guardar: compruebe su conexión';throw ex});inFlight.set(qid,next);return next}
+function persistAnswer(qid,value){const session=state.activeStudent;const previous=inFlight.get(qid)||Promise.resolve();const next=previous.catch(()=>{}).then(()=>{if(!session||state.activeStudent?.token!==session.token)throw Error('La sesión anterior ya no está activa.');return studentSave(qid,value)}).then(()=>{if($('#save-state')&&state.view==='student-exam'&&state.activeStudent?.token===session?.token)$('#save-state').textContent='Respuestas guardadas';}).catch(ex=>{if(/Otra sesión activa/i.test(ex?.message||''))endConflictingSession(session);else if(isRevokedSession(ex))invalidateStudentSession(session);if($('#save-state')&&state.activeStudent?.token===session?.token)$('#save-state').textContent='Error al guardar: compruebe su conexión';throw ex});inFlight.set(qid,next);return next}
 async function flushAnswers(){for(const [qid,t] of pendingTimers){clearTimeout(t);pendingTimers.delete(qid);await persistAnswer(qid,studentAnswers.get(qid))}await Promise.all([...inFlight.values()]);}
 function unansweredStudentQuestions(){
  if(!studentLoad?.questions)return [];
