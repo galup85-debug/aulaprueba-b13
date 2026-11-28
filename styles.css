@@ -257,3 +257,6 @@ body{min-width:280px}
 .supervision-report{break-inside:auto}
 @media(max-width:760px){.institutional-author{font-size:10px}.supervision-report .supervision-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media print{.institutional-author{display:block!important;color:#455a64!important}}
+
+/* v5.7 · Resultado individual al entregar */
+#immediate-result{margin-top:22px;text-align:left}.result-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.result-kpis>div{border:1px solid #d8e6eb;background:#f7fafb;padding:15px;border-radius:12px;text-align:center}.result-kpis span{display:block;font-size:13px;color:#506875}.result-kpis strong{display:block;font-size:clamp(25px,6vw,35px);color:#123b4a;margin-top:6px}.result-feedback{margin-top:16px;padding:15px 16px;border:1px solid #d8e6eb;border-radius:12px;background:#fff}.result-feedback h2{font-size:17px;color:#123b4a;margin:0 0 9px}.result-feedback p{line-height:1.55;margin:0;font-size:14px}
