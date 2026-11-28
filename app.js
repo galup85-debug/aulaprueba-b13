@@ -231,7 +231,47 @@ function downloadExamQR() {
 function teacherEntrance(){if(isDemo){setView('teacher-unavailable');app.innerHTML='<div class="narrow card"><h1>Panel docente no disponible</h1><p>La página todavía no está conectada a Supabase. Por seguridad, el panel del profesor no se habilita en la demostración pública.</p><p>Configura Supabase y autoriza el correo docente antes de administrar evaluaciones.</p><button class="btn btn-outline" data-action="home">Volver al ingreso estudiantil</button></div>';return}if(state.teacher)return teacherList();return teacherLogin()}
 function teacherLogin(){setView('login');app.innerHTML=`<div class="narrow"><section class="hero"><div class="eyebrow">Acceso docente</div><h1>Panel del profesor</h1><p>Ingresa sin contraseña. Recibirás un enlace de acceso en tu correo electrónico.</p></section><div class="card"><form id="login-form"><div class="field"><label for="email">Correo electrónico del docente</label><input id="email" type="email" autocomplete="email" placeholder="docente@liceo.cl" maxlength="254" required /></div><button class="btn block" type="submit">Enviar enlace de acceso</button></form><p class="hint">Abre el enlace desde el mismo navegador o desde el dispositivo en que quieras utilizar el panel. Este acceso requiere una cuenta docente autorizada en Supabase.</p></div></div>`;}
 async function teacherList(){setView('teacher-list');app.innerHTML='<div class="loading">Cargando evaluaciones…</div>';
- try{state.exams=await teacherExams();app.innerHTML=`<div class="subhead"><div><div class="eyebrow">Área docente</div><h1>Mis evaluaciones</h1><p class="muted mini">Cree una prueba y comparta su código cuando esté publicada.</p></div><button class="btn" data-action="new-exam">+ Nueva prueba</button></div><div class="exam-list">${state.exams.length?state.exams.map(e=>`<article class="exam-row"><div><h3>${esc(e.title)} <span class="pill ${esc(e.status)}">${statusLabel(e.status)}</span></h3><div class="exam-meta"><span>Código <b>${esc(e.code)}</b></span><span>Tiempo máximo: ${e.duration_minutes} min</span><span>${fmt(e.created_at)}</span></div></div><div class="btn-row"><button class="btn btn-outline small" data-action="open-exam" data-id="${e.id}">${e.status==='draft'?'Editar':'Supervisar'}</button><button class="btn btn-outline small" data-action="export-exam-script" data-id="${esc(e.id)}">Generar script</button><button class="btn btn-danger small" data-action="delete-exam" data-id="${esc(e.id)}" ${e.status==='published'?'disabled title="Cierra primero esta evaluación"':''}>Eliminar</button></div></article>`).join(''):'<div class="card empty">Todavía no has creado una evaluación.</div>'}</div>`;}catch(e){err(e);viewHome()}}
+ try{state.exams=await teacherExams();app.innerHTML=`<div class="subhead"><div><div class="eyebrow">Área docente</div><h1>Mis evaluaciones</h1><p class="muted mini">Cree una prueba y comparta su código cuando esté publicada.</p></div><button class="btn" data-action="new-exam">+ Nueva prueba</button></div><div class="exam-list">${state.exams.length?state.exams.map(e=>`<article class="exam-row"><div><h3>${esc(e.title)} <span class="pill ${esc(e.status)}">${statusLabel(e.status)}</span></h3><div class="exam-meta"><span>Código <b>${esc(e.code)}</b></span><span>Tiempo máximo: ${e.duration_minutes} min</span><span>${fmt(e.created_at)}</span></div></div><div class="btn-row"><button class="btn btn-outline small" data-action="open-exam" data-id="${e.id}">${e.status==='draft'?'Editar':'Supervisar'}</button><button class="btn btn-outline small" data-action="duplicate-exam" data-id="${esc(e.id)}">Duplicar prueba</button><button class="btn btn-outline small" data-action="export-exam-script" data-id="${esc(e.id)}">Generar script</button><button class="btn btn-danger small" data-action="delete-exam" data-id="${esc(e.id)}" ${e.status==='published'?'disabled title="Cierra primero esta evaluación"':''}>Eliminar</button></div></article>`).join(''):'<div class="card empty">Todavía no has creado una evaluación.</div>'}</div>`;}catch(e){err(e);viewHome()}}
+let teacherMutationBusy=false;
+async function duplicateExam(id){
+ if(teacherMutationBusy)return;
+ if(!state.teacher&&!isDemo)throw Error('Acceso no autorizado.');
+ const ex=state.exams.find(e=>e.id===id)||(state.exam?.id===id?state.exam:null);
+ if(!ex)throw Error('No se encontró la evaluación.');
+ const title=prompt('Nombre de la copia. Puedes añadir el curso de destino.',ex.title.slice(0,185)+' — Copia');
+ if(title===null)return;
+ const name=title.trim();
+ if(name.length<3||name.length>200)throw Error('El nombre debe tener entre 3 y 200 caracteres.');
+ teacherMutationBusy=true;
+ try{
+  let newId;
+  if(isDemo){
+   const d=db(),dst={...ex,id:uid(),title:name,code:code(),status:'draft',created_at:iso()};
+   d.exams.push(dst);d.questions.push(...copy(d.questions.filter(q=>q.exam_id===id)).map(q=>({...q,id:uid(),exam_id:dst.id})));putDb(d);newId=dst.id;
+  }else{
+   const r=await supa.rpc('qx_duplicate_exam',{p_exam:id,p_title:name,p_code:code()});
+   if(r.error&&missingPedagogy(r.error))throw Error('Ejecuta actualizacion_v56.sql en Supabase para activar la duplicación.');
+   newId=check(r);
+  }
+  state.exams=await teacherExams();await openExam(newId);
+  toast('Copia creada como borrador, con código nuevo y sin alumnos ni resultados.',6000);
+ }finally{teacherMutationBusy=false}
+}
+async function removeParticipant(id){
+ if(teacherMutationBusy||state.view!=='dashboard')return;
+ if(!state.teacher&&!isDemo)throw Error('Acceso no autorizado.');
+ const ex=state.exam,st=state.snapshot?.students.find(x=>x.id===id);
+ if(!st)throw Error('El alumno ya no figura en esta prueba.');
+ const answered=(state.snapshot.answers||[]).filter(a=>a.participant_id===id).length;
+ if(!confirm('¿Eliminar el registro de '+st.name+' ('+(st.curso||'sin curso')+', lista '+(st.numero_lista??'—')+') de esta evaluación? Se eliminarán '+answered+' respuesta(s), las calificaciones e incidencias de este intento. Su sesión dejará de ser válida y podrá volver a inscribirse si la prueba sigue abierta. Esta acción es irreversible.'))return;
+ teacherMutationBusy=true;
+ try{
+  if(isDemo){const d=db();d.students=d.students.filter(x=>x.id!==id||x.exam_id!==ex.id);d.answers=d.answers.filter(a=>a.participant_id!==id);d.events=d.events.filter(e=>e.participant_id!==id);putDb(d)}
+  else{const r=await supa.rpc('qx_remove_participant',{p_exam:ex.id,p_participant:id});if(r.error&&missingPedagogy(r.error))throw Error('Ejecuta actualizacion_v56.sql en Supabase para eliminar registros.');if(!check(r))throw Error('El intento ya no existe o no se pudo eliminar.')}
+  if(state.view==='dashboard'&&state.exam?.id===ex.id){if(state.selectedStudent===id)state.selectedStudent=null;await refreshDashboard();}
+  toast('Registro eliminado. Cupo liberado.',6000);
+ }finally{teacherMutationBusy=false}
+}
 async function deleteExam(id){
  if(!state.teacher&&!isDemo)throw Error('Acceso no autorizado.');
  const ex=state.exams.find(e=>e.id===id);
@@ -597,7 +637,8 @@ async function dashboard(){setView('dashboard');const ex=state.exam;app.innerHTM
  if(!isDemo){realtime=supa.channel(`qx-${ex.id}`).on('postgres_changes',{event:'*',schema:'public',table:'qx_events'},()=>refreshDashboard().catch(console.error)).on('postgres_changes',{event:'*',schema:'public',table:'qx_participants'},()=>refreshDashboard().catch(console.error)).subscribe()}}
  catch(e){err(e);teacherList()}}
 async function refreshDashboard(){if(state.view!=='dashboard')return;
- const next=await teacherSnapshot(state.exam);
+ const examId=state.exam.id;const next=await teacherSnapshot(state.exam);
+ if(state.view!=='dashboard'||state.exam?.id!==examId)return;
  const fresh=(next.events||[]).filter(e=>['hidden','fullscreen_exit'].includes(e.kind)&&!state.announcedIds.has(String(e.id)));
  for(const e of next.events||[])state.announcedIds.add(String(e.id));
  state.snapshot=next;renderDashboard(true);
@@ -609,7 +650,7 @@ async function refreshDashboard(){if(state.view!=='dashboard')return;
    }
  }
 }
-function renderDashboard(refresh=false){if(state.view!=='dashboard')return;const ex=state.exam,s=state.snapshot,students=s.students||[],events=s.events||[];const submitted=students.filter(x=>x.submitted_at).length,hidden=events.filter(e=>e.kind==='hidden').length,blurCount=events.filter(e=>e.kind==='blur').length,fullscreenExits=events.filter(e=>e.kind==='fullscreen_exit').length,online=students.filter(x=>!x.submitted_at&&Date.now()-new Date(x.last_seen_at).getTime()<=45000).length;const list=students.map(st=>{const grade=scoring(st,s,state.questions);const eh=countEvents(st,s,'hidden'),ef=countEvents(st,s,'fullscreen_exit'),eb=countEvents(st,s,'blur');return `<tr><td><b>${esc(st.name)}</b><div class="mini muted">${esc(st.curso||'Curso no registrado')} · N.º ${esc(st.numero_lista??'—')} · ${esc(st.email||'Sin correo registrado')}</div></td><td>${esc(statusStudent(st,ex))}</td><td>${grade.max?`${num(grade.auto)} / ${num(grade.max)}`:'—'}${grade.open?` <span class="muted mini">+ abiertas</span>`:''}</td><td>${eh||ef||eb?`<span class="badge-alert">${eh} pestaña no visible · ${eb} pérdidas de foco · ${ef} salidas de pantalla completa</span>`:'0'}</td><td>${fmt(st.last_seen_at)}</td><td><div class="btn-row"><button class="btn btn-ghost small" data-action="inspect" data-id="${st.id}">Detalle</button><button class="btn btn-outline small" data-action="prepare-email" data-id="${st.id}" ${!st.submitted_at||!st.email?'disabled':''}>Preparar correo</button><button class="btn btn-green small" data-action="send-email" data-id="${st.id}" ${!st.submitted_at||!st.email?'disabled':''}>Enviar resultado</button></div></td></tr>`}).join('');
+function renderDashboard(refresh=false){if(state.view!=='dashboard')return;const ex=state.exam,s=state.snapshot,students=s.students||[],events=s.events||[];const submitted=students.filter(x=>x.submitted_at).length,hidden=events.filter(e=>e.kind==='hidden').length,blurCount=events.filter(e=>e.kind==='blur').length,fullscreenExits=events.filter(e=>e.kind==='fullscreen_exit').length,online=students.filter(x=>!x.submitted_at&&Date.now()-new Date(x.last_seen_at).getTime()<=45000).length;const list=students.map(st=>{const grade=scoring(st,s,state.questions);const eh=countEvents(st,s,'hidden'),ef=countEvents(st,s,'fullscreen_exit'),eb=countEvents(st,s,'blur');return `<tr><td><b>${esc(st.name)}</b><div class="mini muted">${esc(st.curso||'Curso no registrado')} · N.º ${esc(st.numero_lista??'—')} · ${esc(st.email||'Sin correo registrado')}</div></td><td>${esc(statusStudent(st,ex))}</td><td>${grade.max?`${num(grade.auto)} / ${num(grade.max)}`:'—'}${grade.open?` <span class="muted mini">+ abiertas</span>`:''}</td><td>${eh||ef||eb?`<span class="badge-alert">${eh} pestaña no visible · ${eb} pérdidas de foco · ${ef} salidas de pantalla completa</span>`:'0'}</td><td>${fmt(st.last_seen_at)}</td><td><div class="btn-row"><button class="btn btn-ghost small" data-action="inspect" data-id="${st.id}">Detalle</button><button class="btn btn-outline small" data-action="prepare-email" data-id="${st.id}" ${!st.submitted_at||!st.email?'disabled':''}>Preparar correo</button><button class="btn btn-green small" data-action="send-email" data-id="${st.id}" ${!st.submitted_at||!st.email?'disabled':''}>Enviar resultado</button><button class="btn btn-danger small" data-action="remove-participant" data-id="${esc(st.id)}">Eliminar registro</button></div></td></tr>`}).join('');
  const labels={fullscreen_exit:'Abandonó pantalla completa',fullscreen_enter:'Restableció pantalla completa',hidden:'Pestaña no visible',visible:'Regresó a la pestaña',blur:'Perdió foco',focus:'Recuperó foco',offline:'Sin conexión del dispositivo',online:'Conexión recuperada',pagehide:'Salida/navegación',reload:'Recarga'};
  const incidents=events.slice(0,30).map(e=>{const st=students.find(s=>s.id===e.participant_id);return `<div class="event-row"><span><span class="event-label">${esc(st?.name||'Alumno')}</span> <span class="event-type">${esc(labels[e.kind]||e.kind)}</span></span><span class="event-time">${fmt(e.occurred_at)}</span></div>`}).join('');
  const detail=state.selectedStudent&&students.find(x=>x.id===state.selectedStudent);
@@ -898,6 +939,8 @@ async function finalizeStudent(){showSubmitReview()}
 /* ============================== UI EVENTS ============================== */
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;try{
  if(a==='home'){viewHome();return}if(a==='teacher'){await teacherEntrance();return}if(a==='student'){studentEntrance();return}if(a==='teacher-list'){await teacherList();return}if(a==='new-exam'){await newExam();return}if(a==='open-exam'){await openExam(b.dataset.id);return}
+ if(a==='duplicate-exam'){b.disabled=true;try{await duplicateExam(b.dataset.id)}finally{b.disabled=false}return}
+ if(a==='remove-participant'){b.disabled=true;try{await removeParticipant(b.dataset.id)}finally{b.disabled=false}return}
  if(a==='delete-exam'){b.disabled=true;try{await deleteExam(b.dataset.id)}finally{b.disabled=false}return}
  if(a==='export-exam-script'){await exportSavedExamScript(b.dataset.id);return}
  if(a==='pdf-apply'){applyPDFReview();return}
