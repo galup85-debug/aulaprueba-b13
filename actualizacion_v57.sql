@@ -7,7 +7,7 @@ alter table public.qx_exams add column if not exists resultado_inmediato boolean
 -- No devuelve alternativas correctas, respuestas de otros alumnos ni claves de corrección.
 create or replace function public.qx_student_result(p_exam uuid,p_token text)
 returns jsonb language plpgsql security definer set search_path='' as $$
-declare st public.qx_participants; ex public.qx_exams; dims jsonb:='["Conocimiento","Habilidad","Eje temático"]'; specs jsonb:='[]'; result jsonb;
+declare st public.qx_participants; ex public.qx_exams; earned numeric; maximum numeric;
 begin
  st:=qx_private.resolve_student(p_exam,p_token);
  select * into ex from public.qx_exams where id=p_exam;
@@ -16,29 +16,12 @@ begin
  if not exists(select 1 from public.qx_questions where exam_id=p_exam)
  or exists(select 1 from public.qx_questions where exam_id=p_exam and (kind not in ('single','multi') or jsonb_array_length(correct)=0))
  then return jsonb_build_object('available',false,'reason','manual'); end if;
- if to_regclass('public.qx_pedagogy') is not null then
-  execute 'select dimensions,specifications from public.qx_pedagogy where exam_id=$1' into dims,specs using p_exam;
- end if;
- dims:=coalesce(dims,'["Conocimiento","Habilidad","Eje temático"]'::jsonb);
- specs:=coalesce(specs,'[]'::jsonb);
- with scored as (
-  select q.position,q.points,
-   case when q.kind='single' and a.response=q.correct->0 then q.points
-    when q.kind='multi' and jsonb_typeof(a.response)='array' and a.response @> q.correct and q.correct @> a.response then q.points
-    else 0::numeric end earned,
-   a.response is not null and a.response<>'null'::jsonb and a.response<>'[]'::jsonb answered,
-   specs->(row_number() over(order by q.position)::int-1) tags
-  from public.qx_questions q left join public.qx_answers a on a.question_id=q.id and a.participant_id=st.id
-  where q.exam_id=p_exam
- ), totals as (select sum(earned) earned,sum(points) maximum,count(*) total,count(*) filter(where answered) answered from scored),
- groups as (
-  select d.i dimension,trim(s.tags->>d.i) category,sum(s.earned) earned,sum(s.points) maximum,count(*) items
-  from scored s cross join generate_series(0,2) d(i)
-  where coalesce(trim(s.tags->>d.i),'')<>'' group by d.i,trim(s.tags->>d.i)
- )
- select jsonb_build_object('available',t.maximum>0,'reason',case when t.maximum<=0 then 'zero' else null end,'earned',t.earned,'maximum',t.maximum,'total',t.total,'answered',t.answered,'exigencia',ex.exigencia,
- 'dimensions',dims,'groups',coalesce((select jsonb_agg(jsonb_build_object('dimension',g.dimension,'category',g.category,'earned',g.earned,'maximum',g.maximum,'items',g.items) order by g.dimension,g.category) from groups g),'[]'::jsonb)) into result from totals t;
- return result;
+ select coalesce(sum(case when q.kind='single' and a.response=q.correct->0 then q.points
+  when q.kind='multi' and jsonb_typeof(a.response)='array' and a.response @> q.correct and q.correct @> a.response then q.points
+  else 0::numeric end),0),coalesce(sum(q.points),0) into earned,maximum
+ from public.qx_questions q left join public.qx_answers a on a.question_id=q.id and a.participant_id=st.id where q.exam_id=p_exam;
+ -- No devolver resultados por pregunta ni por categoría, ni cantidad de aciertos.
+ return jsonb_build_object('available',maximum>0,'earned',earned,'maximum',maximum,'exigencia',ex.exigencia);
 end $$;
 revoke all on function public.qx_student_result(uuid,text) from public,anon,authenticated;
 grant execute on function public.qx_student_result(uuid,text) to anon,authenticated;
@@ -63,5 +46,22 @@ begin
 end $$;
 revoke all on function public.qx_duplicate_exam(uuid,text,text) from public,anon,authenticated;
 grant execute on function public.qx_duplicate_exam(uuid,text,text) to authenticated;
+create or replace function public.qx_student_save(p_exam uuid,p_token text,p_question uuid,p_response jsonb)
+returns boolean language plpgsql security definer set search_path='' as $$
+declare st public.qx_participants; ex public.qx_exams;
+begin
+ st:=qx_private.resolve_student(p_exam,p_token);
+ select * into st from public.qx_participants where id=st.id for update;
+ if not found then raise exception 'Sesión no reconocida'; end if;
+ select * into ex from public.qx_exams where id=p_exam;
+ if st.submitted_at is not null or ex.status<>'published' or clock_timestamp()>st.joined_at+make_interval(mins=>ex.duration_minutes)
+ then raise exception 'La prueba está cerrada o el tiempo finalizó'; end if;
+ if not exists(select 1 from public.qx_questions where id=p_question and exam_id=p_exam) then raise exception 'La pregunta no pertenece a esta prueba'; end if;
+ if length(p_response::text)>30000 then raise exception 'Respuesta demasiado extensa'; end if;
+ insert into public.qx_answers(participant_id,question_id,response) values(st.id,p_question,p_response)
+ on conflict(participant_id,question_id) do update set response=excluded.response,saved_at=clock_timestamp();
+ update public.qx_participants set last_seen_at=clock_timestamp() where id=st.id;
+ return true;
+end $$;
 commit;
 notify pgrst,'reload schema';
